@@ -5,8 +5,18 @@
  * reads instead of re-deriving from literals).
  */
 
-export type CustomerStatus = 'draft' | 'active' | 'inactive' | 'archived';
-export type ProductStatus = 'draft' | 'active' | 'discontinued' | 'archived';
+export type CustomerStatus =
+  | 'draft'
+  | 'active'
+  | 'inactive'
+  | 'archived'
+  | 'merged';
+export type ProductStatus =
+  | 'draft'
+  | 'active'
+  | 'discontinued'
+  | 'archived'
+  | 'merged';
 
 /** Semantic tone shared by status badges and other status-driven UI. */
 export type StatusTone = 'neutral' | 'positive' | 'warning' | 'danger' | 'muted';
@@ -25,6 +35,7 @@ export const CUSTOMER_STATUS_META: Record<
   active: { value: 'active', label: '有効', tone: 'positive' },
   inactive: { value: 'inactive', label: '無効', tone: 'warning' },
   archived: { value: 'archived', label: 'アーカイブ', tone: 'muted' },
+  merged: { value: 'merged', label: '統合済み', tone: 'muted' },
 };
 
 export const PRODUCT_STATUS_META: Record<
@@ -35,8 +46,12 @@ export const PRODUCT_STATUS_META: Record<
   active: { value: 'active', label: '有効', tone: 'positive' },
   discontinued: { value: 'discontinued', label: '販売終了', tone: 'danger' },
   archived: { value: 'archived', label: 'アーカイブ', tone: 'muted' },
+  merged: { value: 'merged', label: '統合済み', tone: 'muted' },
 };
 
+// Manually selectable lifecycle statuses (forms/filters). 'merged' is
+// system-set by the merge use case and intentionally excluded here so stewards
+// cannot pick it by hand; it still renders via *_STATUS_META for badges.
 export const CUSTOMER_STATUS_VALUES: CustomerStatus[] = [
   'draft',
   'active',

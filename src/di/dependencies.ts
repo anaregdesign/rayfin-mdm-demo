@@ -4,6 +4,7 @@ import type { AuthService } from '@/domain/ports/auth-service';
 import type { Clock } from '@/domain/ports/clock';
 import type { ChangeLogRepository } from '@/domain/repositories/change-log-repository';
 import type { CustomerRepository } from '@/domain/repositories/customer-repository';
+import type { MergeRecordRepository } from '@/domain/repositories/merge-record-repository';
 import type { ProductRepository } from '@/domain/repositories/product-repository';
 
 /**
@@ -15,6 +16,7 @@ export interface AppDependencies {
   customers: CustomerRepository;
   products: ProductRepository;
   changeLog: ChangeLogRepository;
+  merges: MergeRecordRepository;
   clock: Clock;
   /** True when the auth service requires Fabric interactive sign-in. */
   fabricAuthEnabled: boolean;

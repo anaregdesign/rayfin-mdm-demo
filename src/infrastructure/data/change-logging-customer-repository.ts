@@ -87,6 +87,29 @@ export class ChangeLoggingCustomerRepository implements CustomerRepository {
     });
   }
 
+  async markMerged(loserId: string, winnerId: string): Promise<void> {
+    const before = await this.inner.findById(loserId);
+    await this.inner.markMerged(loserId, winnerId);
+    await this.safeAppend({
+      entityId: loserId,
+      action: 'status',
+      changes: before
+        ? [{ field: 'status', before: before.status, after: 'merged' }]
+        : [],
+      summary: '統合により「統合済み」に変更',
+    });
+  }
+
+  async restoreMerged(loserId: string, status: CustomerStatus): Promise<void> {
+    await this.inner.restoreMerged(loserId, status);
+    await this.safeAppend({
+      entityId: loserId,
+      action: 'status',
+      changes: [{ field: 'status', before: 'merged', after: status }],
+      summary: `統合解除により ${customerStatusLabel(status)} に復元`,
+    });
+  }
+
   private async safeAppend(entry: {
     entityId: string;
     action: ChangeAction;

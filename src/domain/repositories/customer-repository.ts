@@ -12,4 +12,8 @@ export interface CustomerRepository {
   update(id: string, input: CustomerInput): Promise<Customer>;
   setStatus(id: string, status: CustomerStatus): Promise<Customer>;
   remove(id: string): Promise<void>;
+  /** Mark a loser as merged into a winner (sets status/mergedInto/mergedAt). */
+  markMerged(loserId: string, winnerId: string): Promise<void>;
+  /** Reverse a merge: restore the loser's prior status and clear the xref. */
+  restoreMerged(loserId: string, status: CustomerStatus): Promise<void>;
 }

@@ -51,13 +51,21 @@ export class Customer {
   @decimal({ optional: true }) annualRevenue?: number;
 
   /** Lifecycle status for governance workflow. */
-  @set('draft', 'active', 'inactive', 'archived')
-  status!: 'draft' | 'active' | 'inactive' | 'archived';
+  @set('draft', 'active', 'inactive', 'archived', 'merged')
+  status!: 'draft' | 'active' | 'inactive' | 'archived' | 'merged';
 
   /** Data steward responsible for this record. */
   @text({ max: 120, optional: true }) steward?: string;
 
   @text({ max: 1000, optional: true }) notes?: string;
+
+  /**
+   * Survivorship cross-reference. When `status` is 'merged', points at the
+   * surviving (winner) customer id. Stored as text (not a declared FK) since
+   * the app resolves it in memory. Set/cleared by the merge use case.
+   */
+  @text({ max: 60, optional: true }) mergedInto?: string;
+  @date({ optional: true }) mergedAt?: Date;
 
   @date() createdAt!: Date;
   @date() updatedAt!: Date;

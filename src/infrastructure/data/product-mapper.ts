@@ -30,6 +30,8 @@ export function toProduct(row: ProductRow): Product {
     status: row.status,
     steward: row.steward ?? undefined,
     notes: row.notes ?? undefined,
+    mergedInto: row.mergedInto ?? undefined,
+    mergedAt: row.mergedAt ? new Date(row.mergedAt) : undefined,
     createdAt: new Date(row.createdAt),
     updatedAt: new Date(row.updatedAt),
     createdBy: row.createdBy ?? undefined,

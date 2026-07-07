@@ -30,6 +30,8 @@ const CUSTOMER_FIELDS = [
   'status',
   'steward',
   'notes',
+  'mergedInto',
+  'mergedAt',
   'createdAt',
   'updatedAt',
   'createdBy',
@@ -100,5 +102,32 @@ export class RayfinCustomerRepository implements CustomerRepository {
 
   async remove(id: string): Promise<void> {
     await this.client.data.Customer.delete({ id });
+  }
+
+  async markMerged(loserId: string, winnerId: string): Promise<void> {
+    const now = this.clock.now();
+    await this.client.data.Customer.update(
+      { id: loserId },
+      {
+        status: 'merged',
+        mergedInto: winnerId,
+        mergedAt: now,
+        updatedAt: now,
+        updatedBy: this.actor(),
+      }
+    );
+  }
+
+  async restoreMerged(loserId: string, status: CustomerStatus): Promise<void> {
+    await this.client.data.Customer.update(
+      { id: loserId },
+      {
+        status,
+        mergedInto: undefined,
+        mergedAt: undefined,
+        updatedAt: this.clock.now(),
+        updatedBy: this.actor(),
+      }
+    );
   }
 }

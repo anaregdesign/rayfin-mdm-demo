@@ -11,6 +11,9 @@ const CUSTOMER_TRANSITIONS: Record<CustomerStatus, CustomerStatus[]> = {
   active: ['inactive', 'archived'],
   inactive: ['active', 'archived'],
   archived: ['draft'],
+  // 'merged' is a terminal, system-set state. It has no manual transitions;
+  // only the merge use case (unmerge) restores a record out of it.
+  merged: [],
 };
 
 export function allowedCustomerTransitions(
@@ -27,7 +30,7 @@ export function canTransitionCustomer(
 }
 
 export function canEditCustomer(c: Pick<Customer, 'status'>): boolean {
-  return c.status !== 'archived';
+  return c.status !== 'archived' && c.status !== 'merged';
 }
 
 export function canDeleteCustomer(c: Pick<Customer, 'status'>): boolean {

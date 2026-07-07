@@ -26,6 +26,8 @@ const PRODUCT_FIELDS = [
   'status',
   'steward',
   'notes',
+  'mergedInto',
+  'mergedAt',
   'createdAt',
   'updatedAt',
   'createdBy',
@@ -96,5 +98,32 @@ export class RayfinProductRepository implements ProductRepository {
 
   async remove(id: string): Promise<void> {
     await this.client.data.Product.delete({ id });
+  }
+
+  async markMerged(loserId: string, winnerId: string): Promise<void> {
+    const now = this.clock.now();
+    await this.client.data.Product.update(
+      { id: loserId },
+      {
+        status: 'merged',
+        mergedInto: winnerId,
+        mergedAt: now,
+        updatedAt: now,
+        updatedBy: this.actor(),
+      }
+    );
+  }
+
+  async restoreMerged(loserId: string, status: ProductStatus): Promise<void> {
+    await this.client.data.Product.update(
+      { id: loserId },
+      {
+        status,
+        mergedInto: undefined,
+        mergedAt: undefined,
+        updatedAt: this.clock.now(),
+        updatedBy: this.actor(),
+      }
+    );
   }
 }

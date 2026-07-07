@@ -25,6 +25,10 @@ export interface Customer {
   status: CustomerStatus;
   steward?: string;
   notes?: string;
+  /** When status is 'merged', the winner (surviving) customer id. */
+  mergedInto?: string;
+  /** When status is 'merged', when the merge happened. */
+  mergedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
   createdBy?: string;
