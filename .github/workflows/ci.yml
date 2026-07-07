@@ -1,0 +1,50 @@
+name: CI
+
+# Quality gates for pull requests. No cloud credentials are used here — this
+# workflow only compiles, lints, tests, and bundles the app to catch regressions
+# before a change is merged into main (main is deployed by deploy.yml).
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Cancel superseded runs on the same branch/PR to save minutes.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Lint · Typecheck · Test · Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint (eslint)
+        run: npm run lint
+
+      - name: Typecheck (tsc -b)
+        run: npx tsc -b
+
+      - name: Test (vitest)
+        run: npm test
+
+      # Build the bundle to catch build-time errors. Real RAYFIN_PUBLIC_* values
+      # are NOT needed here (rayfin/.env is gitignored and absent in CI); this is
+      # purely a compile/bundle gate. The real, value-injected build happens in
+      # deploy.yml via `rayfin up`.
+      - name: Build (vite)
+        run: npx vite build

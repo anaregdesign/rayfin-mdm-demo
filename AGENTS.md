@@ -143,6 +143,63 @@ each deploy; use `--dry-run` to preview and `--force` only when you knowingly
 accept destructive schema changes. All entities are `@authenticated('*')` because
 anonymous access is not supported on Fabric.
 
+### CI/CD (GitHub Actions)
+
+Two workflows in `.github/workflows/` automate quality gates and deployment.
+
+- **`ci.yml` — pull-request gate.** Triggers on PRs to `main` (and manual
+  dispatch). Runs `npm ci` → `npm run lint` → `npx tsc -b` → `npm test` →
+  `npx vite build` on Node 22. **No cloud credentials.** `rayfin/.env` is
+  gitignored (absent in CI), so the build runs without real `RAYFIN_PUBLIC_*`
+  values — it is purely a compile/bundle gate; the value-injected build happens
+  at deploy time. Call the tools directly (not `npm run build`) to skip the
+  `prebuild` → `rayfin env` hook.
+- **`deploy.yml` — continuous deployment.** Triggers on push to `main` (and
+  manual dispatch), pinned to the `production` environment. Re-runs the same
+  gates (fail-fast), then deploys to Fabric and smoke-tests the live URL
+  (HTTP 200, with retries for CDN propagation).
+
+**Auth model — GitHub OIDC, no stored secret** (the repo is public, so a
+long-lived client secret is deliberately avoided):
+
+```
+GitHub OIDC token (id-token: write)
+  → azure/login@v2            (federated credential on the Entra app)
+  → az account get-access-token --resource https://api.fabric.microsoft.com
+  → RAYFIN_TOKEN              (ambient bearer token; the rayfin CLI consumes it
+                               and bypasses MSAL — one Fabric-scoped token drives
+                               the entire `rayfin up`)
+  → npx rayfin up -y --workspace-id <FABRIC_WORKSPACE_ID>
+```
+
+The Entra **service principal needs no Azure subscription or RBAC** — Fabric
+authorizes it via the org-wide *"service principals can call Fabric public APIs"*
+tenant setting plus an **Admin** role on the target workspace (grant via Fabric
+REST `POST /v1/workspaces/{id}/roleAssignments` with the SP **object id**,
+`type: ServicePrincipal`). `rayfin up` resolves the existing `mdm` item by
+display name and updates it in place, so CI redeploys are **idempotent** (no
+duplicate item) even though `rayfin/.deployments.json` is gitignored.
+
+**Repository configuration** (set via `gh secret/variable set`; not committed):
+
+| Kind     | Name                  | Meaning                                            |
+| -------- | --------------------- | -------------------------------------------------- |
+| secret   | `AZURE_CLIENT_ID`     | Entra app (client) id used for OIDC login          |
+| secret   | `AZURE_TENANT_ID`     | Entra tenant id                                     |
+| variable | `FABRIC_WORKSPACE_ID` | target Fabric workspace (public-by-design)         |
+
+Plus a `production` **environment** and **two federated credentials** on the app
+(subjects `repo:<owner>/<repo>:ref:refs/heads/main` and
+`repo:<owner>/<repo>:environment:production` — the environment subject is the one
+that matches when the deploy job declares `environment: production`).
+
+**To re-provision from scratch** (new fork/tenant): create the Entra app + SP,
+add the two federated credentials (issuer `https://token.actions.githubusercontent.com`,
+audience `api://AzureADTokenExchange`), grant the SP Admin on the workspace,
+then set the three repo config values above. **To rotate:** nothing to rotate —
+OIDC mints a short-lived token per run; revoke by deleting the federated
+credentials or the SP's workspace role.
+
 ### Demo data seeding
 
 The PoC ships with a reproducible seeder that populates the deployed Fabric SQL
