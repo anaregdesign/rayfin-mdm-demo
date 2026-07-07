@@ -1,6 +1,15 @@
 import { useCallback, useMemo, useState } from 'react';
 
+import type { CustomerInput } from '@/domain/models/customer';
 import type { CustomerStatus } from '@/domain/models/master-status';
+import {
+  CUSTOMER_CSV_HEADERS,
+  customerImportTemplate,
+  customerToCsvRow,
+  evaluateCustomerImport,
+} from '@/domain/policies/import-policy';
+import { useCsvExport } from '@/usecase/export/use-export';
+import { useImport, type ImportController } from '@/usecase/import/use-import';
 import { toMessage } from '@/lib/errors';
 
 import { useCustomers } from './use-customers';
@@ -26,6 +35,9 @@ export interface CustomerListPageViewModel {
   changeStatus: (id: string, status: CustomerStatus) => Promise<void>;
   deleteCustomer: (id: string) => Promise<void>;
   reload: () => Promise<void>;
+  importer: ImportController<CustomerInput>;
+  exportCsv: () => void;
+  downloadTemplate: () => void;
 }
 
 /** Orchestrates the customer list screen: filters, derived view, row actions. */
@@ -41,6 +53,30 @@ export function useCustomerListPage(): CustomerListPageViewModel {
     () => buildCustomerListView(store.customers, filters),
     [store.customers, filters]
   );
+
+  const exporter = useCsvExport();
+
+  const buildPreview = useCallback(
+    (records: Record<string, string>[], mode: Parameters<typeof evaluateCustomerImport>[2]) =>
+      evaluateCustomerImport(records, store.customers, mode),
+    [store.customers]
+  );
+
+  const importer = useImport<CustomerInput>({
+    buildPreview,
+    create: store.createCustomer,
+    update: store.updateCustomer,
+    reload: store.reload,
+  });
+
+  const exportCsv = useCallback(() => {
+    const rows = view.items.map((item) => customerToCsvRow(item.customer));
+    exporter.exportMatrix('customers.csv', [CUSTOMER_CSV_HEADERS, ...rows]);
+  }, [exporter, view.items]);
+
+  const downloadTemplate = useCallback(() => {
+    exporter.exportMatrix('customers-template.csv', customerImportTemplate());
+  }, [exporter]);
 
   const setSearch = useCallback(
     (search: string) => setFilters((f) => ({ ...f, search })),
@@ -98,5 +134,8 @@ export function useCustomerListPage(): CustomerListPageViewModel {
     changeStatus,
     deleteCustomer,
     reload: store.reload,
+    importer,
+    exportCsv,
+    downloadTemplate,
   };
 }
