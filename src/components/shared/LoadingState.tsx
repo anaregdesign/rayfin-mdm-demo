@@ -1,0 +1,16 @@
+interface LoadingStateProps {
+  label?: string;
+}
+
+/** Simple centered spinner used while a page loads its data. */
+export function LoadingState({ label = '読み込み中…' }: LoadingStateProps) {
+  return (
+    <div className="flex items-center justify-center gap-3 py-16 text-slate-500">
+      <span
+        className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-indigo-600"
+        aria-hidden
+      />
+      <span className="text-sm">{label}</span>
+    </div>
+  );
+}

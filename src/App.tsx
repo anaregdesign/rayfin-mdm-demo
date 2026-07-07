@@ -1,0 +1,77 @@
+import {
+  BrowserRouter,
+  Navigate,
+  Outlet,
+  Route,
+  Routes,
+} from 'react-router-dom';
+
+import { AppShell } from '@/components/layout/AppShell';
+import { LoadingState } from '@/components/shared/LoadingState';
+import { AuthPage } from '@/pages/AuthPage';
+import { CustomerDetailPage } from '@/pages/CustomerDetailPage';
+import { CustomerFormPage } from '@/pages/CustomerFormPage';
+import { CustomerListPage } from '@/pages/CustomerListPage';
+import { DashboardPage } from '@/pages/DashboardPage';
+import { GuidePage } from '@/pages/GuidePage';
+import { ProductDetailPage } from '@/pages/ProductDetailPage';
+import { ProductFormPage } from '@/pages/ProductFormPage';
+import { ProductListPage } from '@/pages/ProductListPage';
+import { useAuth } from '@/usecase/auth/use-auth';
+
+function FullScreenLoading() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-slate-50">
+      <LoadingState />
+    </div>
+  );
+}
+
+/** Renders the sign-in screen, redirecting authenticated users to the app. */
+function AuthRoute() {
+  const { isAuthenticated, loading } = useAuth();
+  if (loading) return <FullScreenLoading />;
+  if (isAuthenticated) return <Navigate to="/" replace />;
+  return <AuthPage />;
+}
+
+/** Guards the app: gates on auth, then wraps children in the app shell. */
+function ProtectedLayout() {
+  const { user, isAuthenticated, loading, signOut } = useAuth();
+  if (loading) return <FullScreenLoading />;
+  if (!isAuthenticated) return <Navigate to="/auth" replace />;
+  return (
+    <AppShell
+      userName={user?.name ?? ''}
+      onSignOut={() => {
+        void signOut();
+      }}
+    >
+      <Outlet />
+    </AppShell>
+  );
+}
+
+/** Route table for the MDM app. */
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/auth" element={<AuthRoute />} />
+        <Route element={<ProtectedLayout />}>
+          <Route path="/" element={<DashboardPage />} />
+          <Route path="/customers" element={<CustomerListPage />} />
+          <Route path="/customers/new" element={<CustomerFormPage />} />
+          <Route path="/customers/:id" element={<CustomerDetailPage />} />
+          <Route path="/customers/:id/edit" element={<CustomerFormPage />} />
+          <Route path="/products" element={<ProductListPage />} />
+          <Route path="/products/new" element={<ProductFormPage />} />
+          <Route path="/products/:id" element={<ProductDetailPage />} />
+          <Route path="/products/:id/edit" element={<ProductFormPage />} />
+          <Route path="/guide" element={<GuidePage />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}

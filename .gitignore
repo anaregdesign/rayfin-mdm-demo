@@ -1,0 +1,74 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies
+node_modules
+
+# Build output
+dist
+dist-ssr
+*.tsbuildinfo
+.vite
+
+# Test coverage
+coverage
+
+# Local env files (`*.local` matches `.env.local`, `.env.*.local`, etc.)
+*.local
+
+# Rayfin — auto-generated or secret-bearing files
+# `rayfin/.env*` covers .env, .env.bak (emitted by env-file v2 migration with
+# secrets), and any future .env-family files Rayfin's runtime adds.
+rayfin/.env*
+rayfin/.deployments.json
+rayfin/.temp/
+
+# Editor / OS
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ---------------------------------------------------------------------------
+# Extra safety nets for public release (belt-and-suspenders)
+# ---------------------------------------------------------------------------
+
+# Environment files — real config/secrets live here; never commit.
+# (`*.local` above already covers .env.local; these catch root .env-family files.)
+.env
+.env.*
+!.env.example
+
+# Rayfin local state, caches, and any brokered auth/token material.
+.rayfin/
+rayfin/.cache/
+rayfin/.auth*
+rayfin/*.token
+
+# Credentials, keys, and certificates — never commit.
+*.pem
+*.key
+*.pfx
+*.p12
+*.crt
+*.cer
+*.keystore
+id_rsa*
+*.secret
+secrets.json
+**/*.token
+
+# Runtime / misc
+*.pid
+*.seed
+*.pid.lock
+.nyc_output
