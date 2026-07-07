@@ -2,6 +2,7 @@ import { ChangeLog } from './ChangeLog.js';
 import { ChangeRequest } from './ChangeRequest.js';
 import { Customer } from './Customer.js';
 import { MergeRecord } from './MergeRecord.js';
+import { OutboxEvent } from './OutboxEvent.js';
 import { Product } from './Product.js';
 import { ProductCategory } from './ProductCategory.js';
 
@@ -17,6 +18,7 @@ export type MdmSchema = {
   MergeRecord: MergeRecord;
   ChangeRequest: ChangeRequest;
   ProductCategory: ProductCategory;
+  OutboxEvent: OutboxEvent;
 };
 
 export const schema = [
@@ -26,4 +28,5 @@ export const schema = [
   MergeRecord,
   ChangeRequest,
   ProductCategory,
+  OutboxEvent,
 ];

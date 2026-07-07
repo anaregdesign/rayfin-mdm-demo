@@ -18,6 +18,7 @@ import { CustomerDetailPage } from '@/pages/CustomerDetailPage';
 import { CustomerFormPage } from '@/pages/CustomerFormPage';
 import { CustomerListPage } from '@/pages/CustomerListPage';
 import { DashboardPage } from '@/pages/DashboardPage';
+import { DistributionPage } from '@/pages/DistributionPage';
 import { GuidePage } from '@/pages/GuidePage';
 import { ProductDetailPage } from '@/pages/ProductDetailPage';
 import { ProductFormPage } from '@/pages/ProductFormPage';
@@ -100,6 +101,7 @@ export default function App() {
           <Route path="/categories" element={<CategoryManagementPage />} />
           <Route path="/workqueue" element={<WorkQueuePage />} />
           <Route path="/remediation" element={<RemediationPage />} />
+          <Route path="/distribution" element={<DistributionPage />} />
           <Route path="/approvals" element={<ApprovalPage />} />
           <Route path="/guide" element={<GuidePage />} />
         </Route>

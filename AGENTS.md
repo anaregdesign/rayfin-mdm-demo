@@ -505,6 +505,69 @@ entity** — so it stays correct as those rules evolve.
   標準化候補あり) linking to the queue via `use-dashboard.ts`'s
   `remediationCount`/`cleansingSuggestionCount`.
 
+### Distribution & integration (Issue #12)
+
+**Distribution / integration** records a business event onto a persisted
+**outbox** whenever a master record changes (transactional-outbox pattern), and
+lets a steward review + manually deliver those events, export the active masters
+as **CSV/JSON**, and configure a **webhook** target. Per the issue, the PoC
+minimum is an in-app event feed + export + a **log-only** webhook — so no real
+HTTP egress happens on the live Fabric demo.
+
+- **The outbox is the one new persisted entity.** `rayfin/data/OutboxEvent.ts`
+  (`entityType` customer/product · `entityId` · `eventType`
+  created/updated/merged/status_changed · `payload` JSON @text max 8000 optional ·
+  `actorId` · `status` pending/delivered/failed · `occurredAt` · `deliveredAt?`),
+  registered in `schema.ts` (additive — safe on `rayfin up`). Mapped to the
+  view-facing `domain/models/distribution` by `infrastructure/data/outbox-event-mapper.ts`
+  (`parsePayload` → `{}` on invalid/non-object; `serializePayload` guards 8000 and
+  falls back to `{id,_truncated:true}`; `toOutboxEvent` maps dates/optionals).
+- **Events are emitted by a decorator, not the usecase.** `infrastructure/data/`
+  `distribution-{customer,product}-repository.ts` wrap the base repo (OUTSIDE the
+  change-logging decorator) behind the same `*Repository` port and `safePublish`
+  (non-fatal) an outbox event on create / update (diff-gated) / setStatus (changed) /
+  markMerged / restoreMerged. One write therefore yields **both** an audit
+  `ChangeLog` entry AND an `OutboxEvent`; the usecase layer is unaware. `remove`
+  emits nothing (no delete event kind). Composition root nests them as
+  `new Distribution*Repository(new ChangeLogging*Repository(new Rayfin*Repository(...),
+  changeLog, actor), outbox, actor)`.
+- **All distribution decisions are a pure policy.**
+  `src/domain/policies/distribution-policy.ts` is the single source of truth:
+  `isDistributable(status)` / `selectDistributable` (**active-only** — drafts,
+  inactive, archived, merged are withheld); `customerEventPayload` /
+  `productEventPayload` (compact snapshots); `filterEvents(events, EventFilter)`
+  (entityType/eventType/status/since, AND-combined, non-mutating);
+  `customer/productExportMatrix` (header + active rows, reuses the #6
+  `*_CSV_HEADERS`/`*ToCsvRow`); `buildCustomer/ProductJsonExport(records, now)`
+  (envelope `{entityType, exportedAt, count, records}`, `now` injected);
+  `signPayload(secret, json)`. No IO/SDK/DOM here.
+- **Webhook is log-only in the PoC; signing is a DEMO digest.** The
+  `HttpClient` port (`src/domain/ports/http-client.ts`) has two adapters:
+  `FetchHttpClient` (real `fetch`, **not** wired live) and `LoggingHttpClient`
+  (console-only, returns `{status:200, ok:true}`, no egress) — the DI root wires
+  **`LoggingHttpClient`** so the live demo stays CORS-safe and side-effect-free.
+  `signPayload` is an honest **non-cryptographic djb2** digest labelled `v1=<hex>`,
+  used only to illustrate the signature header. **Production signing MUST use Web
+  Crypto `HMAC-SHA256`** (async) inside a new `infrastructure/http` adapter — do
+  NOT ship the djb2 digest as real security. This mirrors the #9 "documented-only
+  production path" decision.
+- **Usecase composes stores + IO.** `src/usecase/distribution/use-distribution.ts`
+  (`useDistributionPage`) loads `outbox.list()`, composes `useCustomers` +
+  `useProducts` + `useAuth` for active-only export, and exposes filters,
+  permission-gated manual delivery (`markDelivered`/`markFailed`/`deliverAllVisible`
+  via `outbox.setDeliveryStatus`, gated by `canModifyAny(actor)`), export actions
+  (`useCsvExport`'s `exportMatrix`/`exportJson`), and a log-only webhook test
+  (`httpClient.post`, also gated). A stable `now` (`useState(() => new Date())`)
+  keeps the since-window from drifting across renders.
+- **Render-only components, one per file.** `components/distribution/`:
+  `OutboxEventFeed` (domain/kind/delivery badges via the model's label+tone
+  helpers, payload summary, mark buttons via props), `ExportPanel` (active counts +
+  CSV/JSON buttons), `WebhookTargetCard` (url/secret/active + signature preview +
+  test-send). Thin `pages/DistributionPage.tsx`; route `/distribution` + `AppShell`
+  nav「配信・連携」. **29 unit tests** (`distribution-policy.test.ts` + `outbox-event-mapper.test.ts`)
+  lock the active-only selection, filtering, payload/export/JSON shapes, `signPayload`
+  determinism, and the mapper round-trip/guards.
+
 ### Deployment (Fabric)
 
 The PoC is deployed to Microsoft Fabric. Deploy with `npx rayfin up -y` from the
@@ -624,18 +687,19 @@ npm run seed        # → scripts/seed.mjs
 ### Roadmap & coverage (planned enhancements)
 
 The PoC is measured against the **12-domain general MDM functional requirements**
-laid out at project kickoff. Current breadth is **~90–92%** (core/MVP scope
-~95%). Coverage by domain:
+laid out at project kickoff. Current breadth is **~95–98%** (core/MVP scope
+~98%). Coverage by domain:
 
-- ✅ **Implemented (11):** データモデリング / データ品質（標準化・クレンジング・是正キュー・項目別品質内訳, #11） / 検索・参照 / 分析・レポート /
+- ✅ **Implemented (12):** データモデリング / データ品質（標準化・クレンジング・是正キュー・項目別品質内訳, #11） / 検索・参照 / 分析・レポート /
   バージョン管理（変更履歴・フィールド差分・ロールバック, #5） /
   名寄せ（重複検出＋マージ実行・survivorship・ゴールデンレコード・統合解除, #4） /
   オンボーディング（手動フォーム＋CSV一括インポート/エクスポート・行検証プレビュー, #6） /
   セキュリティ（ロールベース認可・スチュワード行レベル制御・機密項目マスキング, クライアント側, #9） /
   ワークフロー・承認（maker-checker・承認キュー・職務分掌トグル・差分プレビュー, #8） /
   階層・関係管理（顧客組織関係＋製品カテゴリマスタ・循環防止・ドリルダウン, #7） /
-  ガバナンス・スチュワードシップ（品質・重複・滞留・必須未入力を横断集約した優先度付きワークキュー＋担当者別ワークロード, #10）.
-- ❌ **Not implemented (1):** 配信・連携.
+  ガバナンス・スチュワードシップ（品質・重複・滞留・必須未入力を横断集約した優先度付きワークキュー＋担当者別ワークロード, #10） /
+  配信・連携（アウトボックス・イベントフィード・CSV/JSONエクスポート・Webhook（PoCは送信ログのみ）, #12）.
+- ❌ **Not implemented (0)** — 残るギャップは #13 分析強化（品質トレンド・時系列）の深掘りのみ。
 
 **Tracking:** the coverage matrix and roadmap live in **Epic #3**
 (`[Epic] MDM機能カバレッジと不足機能の実装ロードマップ`) — the single source of
@@ -652,7 +716,7 @@ clean-architecture layer map above):
 | P2 | #9  | ロールベース認可・行レベルセキュリティ（@role/RLS） ✅ **done** (client-side) | `security` |
 | P2 | #10 | スチュワードシップ・ワークキュー ✅ **done** | `governance` |
 | P3 | #11 | データ品質ルール拡張（標準化・クレンジング・是正キュー） ✅ **done** | `quality` |
-| P3 | #12 | 配信・連携（下流公開・Webhook/イベント・API） | `distribution` |
+| P3 | #12 | 配信・連携（下流公開・Webhook/イベント・API） ✅ **done** | `distribution` |
 | P3 | #13 | 分析強化（品質トレンド・時系列・レポート出力） | `analytics` |
 
 When picking up feature work: start from the relevant child issue, follow its

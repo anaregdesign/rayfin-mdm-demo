@@ -8,6 +8,8 @@ export interface CsvExporter {
     filename: string,
     matrix: readonly (readonly string[])[]
   ) => void;
+  /** Serialize a value to pretty JSON and trigger a browser download. */
+  exportJson: (filename: string, value: unknown) => void;
 }
 
 /**
@@ -16,13 +18,9 @@ export interface CsvExporter {
  * render-only and the matrix building stays a pure domain concern.
  */
 export function useCsvExport(): CsvExporter {
-  const exportMatrix = useCallback(
-    (filename: string, matrix: readonly (readonly string[])[]) => {
-      const csv = toCsv(matrix);
-      // Prepend a UTF-8 BOM so Excel opens Japanese text without mojibake.
-      const blob = new Blob([`\uFEFF${csv}`], {
-        type: 'text/csv;charset=utf-8;',
-      });
+  const download = useCallback(
+    (filename: string, contents: string, mime: string) => {
+      const blob = new Blob([contents], { type: mime });
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
@@ -36,5 +34,25 @@ export function useCsvExport(): CsvExporter {
     []
   );
 
-  return { exportMatrix };
+  const exportMatrix = useCallback(
+    (filename: string, matrix: readonly (readonly string[])[]) => {
+      const csv = toCsv(matrix);
+      // Prepend a UTF-8 BOM so Excel opens Japanese text without mojibake.
+      download(filename, `\uFEFF${csv}`, 'text/csv;charset=utf-8;');
+    },
+    [download]
+  );
+
+  const exportJson = useCallback(
+    (filename: string, value: unknown) => {
+      download(
+        filename,
+        JSON.stringify(value, null, 2),
+        'application/json;charset=utf-8;'
+      );
+    },
+    [download]
+  );
+
+  return { exportMatrix, exportJson };
 }
