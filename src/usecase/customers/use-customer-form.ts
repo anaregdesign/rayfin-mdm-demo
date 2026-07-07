@@ -2,12 +2,18 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { Customer, CustomerInput } from '@/domain/models/customer';
 import {
+  customerDisplayName,
   customerToInput,
   emptyCustomerInput,
 } from '@/domain/models/customer';
 import type { DuplicatePair } from '@/domain/models/duplicate';
 import type { FieldErrors } from '@/domain/models/validation';
 import { findCustomerMatchesForInput } from '@/domain/policies/duplicate-policy';
+import {
+  buildForest,
+  flattenForest,
+  parentCandidates,
+} from '@/domain/policies/hierarchy-policy';
 import {
   validateCustomerInput,
   type CustomerField,
@@ -20,6 +26,13 @@ import type { SubmitOutcome } from '@/usecase/shared/submit-outcome';
 import { useCustomers } from './use-customers';
 import { useAuth } from '@/usecase/auth/use-auth';
 
+/** Indented parent option for the relation picker (cycle-safe candidates). */
+export interface CustomerParentOption {
+  id: string;
+  label: string;
+  depth: number;
+}
+
 export interface CustomerFormViewModel {
   draft: CustomerInput;
   errors: FieldErrors<CustomerField>;
@@ -30,6 +43,8 @@ export interface CustomerFormViewModel {
   submitError: string | null;
   isEdit: boolean;
   notFound: boolean;
+  /** Cycle-safe, indented parent candidates for the 親会社 picker (Issue #7). */
+  parentOptions: CustomerParentOption[];
   /** False when the active role may not create (new) or edit this record. */
   permitted: boolean;
   /**
@@ -84,6 +99,21 @@ export function useCustomerForm(editId?: string): CustomerFormViewModel {
     () => findCustomerMatchesForInput(draft, store.customers, editId),
     [draft, store.customers, editId]
   );
+
+  // Parent picker options: exclude merged records, then (when editing) the node
+  // itself and its descendants so a relation can never form a cycle. Rendered
+  // as an indented tree.
+  const parentOptions = useMemo<CustomerParentOption[]>(() => {
+    const selectable = store.customers.filter((c) => c.status !== 'merged');
+    const candidates = editId
+      ? parentCandidates(selectable, editId)
+      : selectable;
+    return flattenForest(buildForest(candidates)).map((node) => ({
+      id: node.value.id,
+      label: `${'　'.repeat(node.depth)}${customerDisplayName(node.value)}`,
+      depth: node.depth,
+    }));
+  }, [store.customers, editId]);
 
   const setField = useCallback(
     <K extends CustomerField>(key: K, value: CustomerInput[K]) => {
@@ -147,6 +177,7 @@ export function useCustomerForm(editId?: string): CustomerFormViewModel {
     submitError,
     isEdit,
     notFound,
+    parentOptions,
     permitted,
     approvalRequired: requireApproval,
     setField,

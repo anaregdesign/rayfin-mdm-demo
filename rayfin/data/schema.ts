@@ -3,6 +3,7 @@ import { ChangeRequest } from './ChangeRequest.js';
 import { Customer } from './Customer.js';
 import { MergeRecord } from './MergeRecord.js';
 import { Product } from './Product.js';
+import { ProductCategory } from './ProductCategory.js';
 
 /**
  * Binds entity names to their classes so `RayfinClient` can provide typed
@@ -15,6 +16,14 @@ export type MdmSchema = {
   ChangeLog: ChangeLog;
   MergeRecord: MergeRecord;
   ChangeRequest: ChangeRequest;
+  ProductCategory: ProductCategory;
 };
 
-export const schema = [Customer, Product, ChangeLog, MergeRecord, ChangeRequest];
+export const schema = [
+  Customer,
+  Product,
+  ChangeLog,
+  MergeRecord,
+  ChangeRequest,
+  ProductCategory,
+];

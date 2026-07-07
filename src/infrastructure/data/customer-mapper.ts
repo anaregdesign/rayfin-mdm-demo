@@ -1,4 +1,8 @@
-import type { Customer, CustomerInput } from '@/domain/models/customer';
+import type {
+  Customer,
+  CustomerInput,
+  CustomerRelationType,
+} from '@/domain/models/customer';
 
 import type { Customer as CustomerEntity } from '../../../rayfin/data/Customer';
 
@@ -34,6 +38,8 @@ export function toCustomer(row: CustomerRow): Customer {
     status: row.status,
     steward: row.steward ?? undefined,
     notes: row.notes ?? undefined,
+    parentId: row.parentId ?? undefined,
+    relationType: (row.relationType as CustomerRelationType) ?? undefined,
     mergedInto: row.mergedInto ?? undefined,
     mergedAt: row.mergedAt ? new Date(row.mergedAt) : undefined,
     createdAt: new Date(row.createdAt),
@@ -63,6 +69,8 @@ export interface CustomerFields {
   status: CustomerInput['status'];
   steward?: string;
   notes?: string;
+  parentId?: string;
+  relationType?: CustomerRelationType;
 }
 
 /** Normalize form input into the entity field subset (empty → undefined). */
@@ -86,5 +94,7 @@ export function customerInputToFields(input: CustomerInput): CustomerFields {
     status: input.status,
     steward: blankToUndef(input.steward),
     notes: blankToUndef(input.notes),
+    parentId: blankToUndef(input.parentId),
+    relationType: input.relationType,
   };
 }

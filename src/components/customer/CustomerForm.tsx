@@ -6,9 +6,12 @@ import { TextAreaField } from '@/components/shared/TextAreaField';
 import { TextField } from '@/components/shared/TextField';
 import type {
   CustomerInput,
+  CustomerRelationType,
   CustomerType,
 } from '@/domain/models/customer';
 import {
+  CUSTOMER_RELATION_TYPE_LABELS,
+  CUSTOMER_RELATION_TYPE_VALUES,
   CUSTOMER_TYPE_LABELS,
   CUSTOMER_TYPE_VALUES,
 } from '@/domain/models/customer';
@@ -20,11 +23,14 @@ import {
 } from '@/domain/models/master-status';
 import type { FieldErrors } from '@/domain/models/validation';
 import type { CustomerField } from '@/domain/policies/customer-validation';
+import type { CustomerParentOption } from '@/usecase/customers/use-customer-form';
 
 interface CustomerFormProps {
   draft: CustomerInput;
   errors: FieldErrors<CustomerField>;
   duplicateMatches: DuplicatePair[];
+  /** Cycle-safe, indented parent candidates for the 親会社 picker (Issue #7). */
+  parentOptions: CustomerParentOption[];
   saving: boolean;
   submitError: string | null;
   isEdit: boolean;
@@ -45,11 +51,20 @@ const STATUS_OPTIONS = CUSTOMER_STATUS_VALUES.map((s) => ({
   label: CUSTOMER_STATUS_META[s].label,
 }));
 
+const RELATION_TYPE_OPTIONS = [
+  { value: '', label: '（未設定）' },
+  ...CUSTOMER_RELATION_TYPE_VALUES.map((r) => ({
+    value: r,
+    label: CUSTOMER_RELATION_TYPE_LABELS[r],
+  })),
+];
+
 /** Presentational customer create/edit form. All rules come from the VM. */
 export function CustomerForm({
   draft,
   errors,
   duplicateMatches,
+  parentOptions,
   saving,
   submitError,
   isEdit,
@@ -58,6 +73,10 @@ export function CustomerForm({
   onSubmit,
   onCancel,
 }: CustomerFormProps) {
+  const parentSelectOptions = [
+    { value: '', label: '（親なし・最上位）' },
+    ...parentOptions.map((o) => ({ value: o.id, label: o.label })),
+  ];
   return (
     <form
       onSubmit={(e) => {
@@ -192,6 +211,36 @@ export function CustomerForm({
             className="sm:col-span-2"
             value={draft.notes ?? ''}
             onChange={(v) => onField('notes', v)}
+          />
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        <h3 className="mb-1 text-sm font-semibold text-slate-700">
+          組織階層・関係
+        </h3>
+        <p className="mb-4 text-xs text-slate-500">
+          親会社を選ぶと企業グループの階層を表現できます。自社および配下の顧客は循環を防ぐため選択肢から除外されます。
+        </p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <SelectField
+            label="親会社"
+            value={draft.parentId ?? ''}
+            options={parentSelectOptions}
+            onChange={(v) => onField('parentId', v === '' ? undefined : v)}
+            hint="この顧客が属する上位企業"
+          />
+          <SelectField
+            label="関係区分"
+            value={draft.relationType ?? ''}
+            options={RELATION_TYPE_OPTIONS}
+            onChange={(v) =>
+              onField(
+                'relationType',
+                v === '' ? undefined : (v as CustomerRelationType)
+              )
+            }
+            hint="親会社との関係（子会社・支店など）"
           />
         </div>
       </div>

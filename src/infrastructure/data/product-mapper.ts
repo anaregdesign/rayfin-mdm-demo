@@ -22,6 +22,7 @@ export function toProduct(row: ProductRow): Product {
     category: row.category,
     brand: row.brand ?? undefined,
     description: row.description ?? undefined,
+    categoryId: row.categoryId ?? undefined,
     unitPrice: row.unitPrice,
     currency: row.currency,
     unitOfMeasure: row.unitOfMeasure,
@@ -47,6 +48,7 @@ export interface ProductFields {
   category: ProductInput['category'];
   brand?: string;
   description?: string;
+  categoryId?: string;
   unitPrice: number;
   currency: ProductInput['currency'];
   unitOfMeasure: ProductInput['unitOfMeasure'];
@@ -66,6 +68,7 @@ export function productInputToFields(input: ProductInput): ProductFields {
     category: input.category,
     brand: blankToUndef(input.brand),
     description: blankToUndef(input.description),
+    categoryId: blankToUndef(input.categoryId),
     unitPrice: input.unitPrice,
     currency: input.currency,
     unitOfMeasure: input.unitOfMeasure,

@@ -4,12 +4,14 @@ import type { ChangeEntry } from '@/domain/models/change-log';
 import type { ProductStatus } from '@/domain/models/master-status';
 import { isMergeActive, type MergeFieldSource } from '@/domain/models/merge';
 import { productToInput, type Product, type ProductInput } from '@/domain/models/product';
+import { categoryDisplayName } from '@/domain/models/category';
 import type { DuplicatePair } from '@/domain/models/duplicate';
 import type { QualityResult } from '@/domain/models/quality';
 import {
   findProductDuplicates,
   pairsForId,
 } from '@/domain/policies/duplicate-policy';
+import { ancestorsOf } from '@/domain/policies/hierarchy-policy';
 import { evaluateProductQuality } from '@/domain/policies/product-quality-policy';
 import { revertChanges } from '@/domain/policies/diff-policy';
 import {
@@ -23,6 +25,7 @@ import {
 } from '@/domain/policies/access-policy';
 import { useDependencies } from '@/di/dependencies';
 import { useAuth } from '@/usecase/auth/use-auth';
+import { useCategories } from '@/usecase/categories/use-categories';
 import { toMessage } from '@/lib/errors';
 import { useChangeHistory } from '@/usecase/history/use-change-history';
 import {
@@ -42,6 +45,8 @@ export interface ProductDetailViewModel {
   product: Product | null;
   quality: QualityResult | null;
   duplicatePairs: DuplicatePair[];
+  /** Breadcrumb of the assigned category master node (root → self), if any. */
+  categoryPath: string | null;
   allowedTransitions: ProductStatus[];
   canEdit: boolean;
   canDelete: boolean;
@@ -70,6 +75,7 @@ export function useProductDetailPage(id: string): ProductDetailViewModel {
   const store = useProducts();
   const deps = useDependencies();
   const { actor } = useAuth();
+  const { categories } = useCategories();
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -87,6 +93,14 @@ export function useProductDetailPage(id: string): ProductDetailViewModel {
     if (!product) return [];
     return pairsForId(findProductDuplicates(store.products), product.id);
   }, [store.products, product]);
+
+  const categoryPath = useMemo<string | null>(() => {
+    if (!product?.categoryId) return null;
+    const self = categories.find((c) => c.id === product.categoryId);
+    if (!self) return null;
+    const chain = [...ancestorsOf(categories, self.id)].reverse();
+    return [...chain, self].map(categoryDisplayName).join(' / ');
+  }, [product, categories]);
 
   const allowedTransitions = product
     ? allowedProductTransitions(product.status)
@@ -247,6 +261,7 @@ export function useProductDetailPage(id: string): ProductDetailViewModel {
     product,
     quality,
     duplicatePairs,
+    categoryPath,
     allowedTransitions,
     canEdit,
     canDelete,

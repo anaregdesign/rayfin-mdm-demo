@@ -14,6 +14,8 @@ export interface Product {
   category: ProductCategory;
   brand?: string;
   description?: string;
+  /** Optional node in the ProductCategory master (Issue #7 hierarchy). */
+  categoryId?: string;
   unitPrice: number;
   currency: Currency;
   unitOfMeasure: UnitOfMeasure;
@@ -109,6 +111,7 @@ export interface ProductInput {
   category: ProductCategory;
   brand?: string;
   description?: string;
+  categoryId?: string;
   unitPrice: number;
   currency: Currency;
   unitOfMeasure: UnitOfMeasure;
@@ -128,6 +131,7 @@ export function productToInput(p: Product): ProductInput {
     category: p.category,
     brand: p.brand,
     description: p.description,
+    categoryId: p.categoryId,
     unitPrice: p.unitPrice,
     currency: p.currency,
     unitOfMeasure: p.unitOfMeasure,

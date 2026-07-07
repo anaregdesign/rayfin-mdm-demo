@@ -30,6 +30,8 @@ const CUSTOMER_FIELDS = [
   'status',
   'steward',
   'notes',
+  'parentId',
+  'relationType',
   'mergedInto',
   'mergedAt',
   'createdAt',

@@ -85,7 +85,11 @@ export function ProductDetailPage() {
         onChange={vm.changeStatus}
       />
 
-      <ProductDetailCard product={vm.product} quality={vm.quality} />
+      <ProductDetailCard
+        product={vm.product}
+        quality={vm.quality}
+        categoryPath={vm.categoryPath}
+      />
 
       <DuplicatePanel
         title="この製品の重複候補"

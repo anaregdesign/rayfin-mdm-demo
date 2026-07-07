@@ -25,6 +25,10 @@ export interface Customer {
   status: CustomerStatus;
   steward?: string;
   notes?: string;
+  /** Parent customer id for org-group / head-office ↔ branch hierarchies (#7). */
+  parentId?: string;
+  /** Nature of the link to the parent record. */
+  relationType?: CustomerRelationType;
   /** When status is 'merged', the winner (surviving) customer id. */
   mergedInto?: string;
   /** When status is 'merged', when the merge happened. */
@@ -48,6 +52,37 @@ export function customerTypeLabel(type: CustomerType): string {
   return CUSTOMER_TYPE_LABELS[type];
 }
 
+/**
+ * How a customer relates to its parent in an org hierarchy (Issue #7). A loose
+ * descriptor for the link — the tree structure itself lives in `parentId`.
+ */
+export type CustomerRelationType =
+  | 'headquarters'
+  | 'subsidiary'
+  | 'branch'
+  | 'group';
+
+export const CUSTOMER_RELATION_TYPE_VALUES: CustomerRelationType[] = [
+  'headquarters',
+  'subsidiary',
+  'branch',
+  'group',
+];
+
+export const CUSTOMER_RELATION_TYPE_LABELS: Record<
+  CustomerRelationType,
+  string
+> = {
+  headquarters: '本社・親会社',
+  subsidiary: '子会社',
+  branch: '支店・拠点',
+  group: 'グループ会社',
+};
+
+export function customerRelationTypeLabel(type: CustomerRelationType): string {
+  return CUSTOMER_RELATION_TYPE_LABELS[type];
+}
+
 /** Editable fields captured by the create/edit form (audit set by the repo). */
 export interface CustomerInput {
   code: string;
@@ -68,6 +103,10 @@ export interface CustomerInput {
   status: CustomerStatus;
   steward?: string;
   notes?: string;
+  /** Parent customer id for org hierarchies (#7); undefined = root. */
+  parentId?: string;
+  /** Nature of the link to the parent record. */
+  relationType?: CustomerRelationType;
 }
 
 /** Map an existing customer to the editable form input shape. */
@@ -91,6 +130,8 @@ export function customerToInput(c: Customer): CustomerInput {
     status: c.status,
     steward: c.steward,
     notes: c.notes,
+    parentId: c.parentId,
+    relationType: c.relationType,
   };
 }
 

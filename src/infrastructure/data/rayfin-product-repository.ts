@@ -18,6 +18,7 @@ const PRODUCT_FIELDS = [
   'category',
   'brand',
   'description',
+  'categoryId',
   'unitPrice',
   'currency',
   'unitOfMeasure',

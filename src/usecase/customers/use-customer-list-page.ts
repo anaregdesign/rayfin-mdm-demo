@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 
 import type { CustomerInput } from '@/domain/models/customer';
+import { customerDisplayName } from '@/domain/models/customer';
 import type { CustomerStatus } from '@/domain/models/master-status';
 import {
   CUSTOMER_CSV_HEADERS,
@@ -8,6 +9,7 @@ import {
   customerToCsvRow,
   evaluateCustomerImport,
 } from '@/domain/policies/import-policy';
+import { buildForest, flattenForest } from '@/domain/policies/hierarchy-policy';
 import { useCsvExport } from '@/usecase/export/use-export';
 import { useImport, type ImportController } from '@/usecase/import/use-import';
 import { can, canModifyAny } from '@/domain/policies/access-policy';
@@ -24,6 +26,13 @@ import {
   type CustomerStatusFilter,
 } from './selectors';
 
+/** An indented option for the hierarchy rollup filter / parent pickers. */
+export interface CustomerHierarchyOption {
+  id: string;
+  label: string;
+  depth: number;
+}
+
 export interface CustomerListPageViewModel {
   loading: boolean;
   error: string | null;
@@ -31,9 +40,13 @@ export interface CustomerListPageViewModel {
   busyId: string | null;
   filters: CustomerListFilters;
   view: CustomerListView;
+  /** Indented customer tree for the hierarchy rollup filter (Issue #7). */
+  hierarchyOptions: CustomerHierarchyOption[];
   setSearch: (search: string) => void;
   setStatusFilter: (status: CustomerStatusFilter) => void;
   setSort: (sort: CustomerSortKey) => void;
+  /** Restrict the list to a customer + its descendants (empty = all). */
+  setAncestor: (id: string) => void;
   changeStatus: (id: string, status: CustomerStatus) => Promise<void>;
   deleteCustomer: (id: string) => Promise<void>;
   reload: () => Promise<void>;
@@ -63,6 +76,16 @@ export function useCustomerListPage(): CustomerListPageViewModel {
   const view = useMemo(
     () => buildCustomerListView(store.customers, filters),
     [store.customers, filters]
+  );
+
+  const hierarchyOptions = useMemo<CustomerHierarchyOption[]>(
+    () =>
+      flattenForest(buildForest(store.customers)).map((node) => ({
+        id: node.value.id,
+        label: `${'　'.repeat(node.depth)}${customerDisplayName(node.value)}`,
+        depth: node.depth,
+      })),
+    [store.customers]
   );
 
   const exporter = useCsvExport();
@@ -99,6 +122,10 @@ export function useCustomerListPage(): CustomerListPageViewModel {
   );
   const setSort = useCallback(
     (sort: CustomerSortKey) => setFilters((f) => ({ ...f, sort })),
+    []
+  );
+  const setAncestor = useCallback(
+    (ancestorId: string) => setFilters((f) => ({ ...f, ancestorId })),
     []
   );
 
@@ -139,9 +166,11 @@ export function useCustomerListPage(): CustomerListPageViewModel {
     busyId,
     filters,
     view,
+    hierarchyOptions,
     setSearch,
     setStatusFilter,
     setSort,
+    setAncestor,
     changeStatus,
     deleteCustomer,
     reload: store.reload,

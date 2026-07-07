@@ -63,9 +63,12 @@ export function CustomerListPage() {
         search={vm.filters.search}
         status={vm.filters.status}
         sort={vm.filters.sort}
+        ancestor={vm.filters.ancestorId}
+        hierarchyOptions={vm.hierarchyOptions}
         onSearch={vm.setSearch}
         onStatusFilter={vm.setStatusFilter}
         onSort={vm.setSort}
+        onAncestor={vm.setAncestor}
       />
 
       {vm.actionError && <ErrorState message={vm.actionError} />}

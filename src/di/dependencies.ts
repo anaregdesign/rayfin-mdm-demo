@@ -4,6 +4,7 @@ import type { AuthService } from '@/domain/ports/auth-service';
 import type { Clock } from '@/domain/ports/clock';
 import type { ChangeLogRepository } from '@/domain/repositories/change-log-repository';
 import type { ChangeRequestRepository } from '@/domain/repositories/change-request-repository';
+import type { CategoryRepository } from '@/domain/repositories/category-repository';
 import type { CustomerRepository } from '@/domain/repositories/customer-repository';
 import type { MergeRecordRepository } from '@/domain/repositories/merge-record-repository';
 import type { ProductRepository } from '@/domain/repositories/product-repository';
@@ -16,6 +17,7 @@ export interface AppDependencies {
   auth: AuthService;
   customers: CustomerRepository;
   products: ProductRepository;
+  categories: CategoryRepository;
   changeLog: ChangeLogRepository;
   merges: MergeRecordRepository;
   changeRequests: ChangeRequestRepository;

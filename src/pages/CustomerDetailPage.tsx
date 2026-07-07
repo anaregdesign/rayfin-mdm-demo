@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { CustomerDetailCard } from '@/components/customer/CustomerDetailCard';
+import { CustomerRelationsPanel } from '@/components/customer/CustomerRelationsPanel';
 import { CustomerStatusActions } from '@/components/customer/CustomerStatusActions';
 import { HistoryTimeline } from '@/components/history/HistoryTimeline';
 import { MergeDialog } from '@/components/merge/MergeDialog';
@@ -90,6 +91,14 @@ export function CustomerDetailPage() {
         quality={vm.quality}
         canViewSensitive={vm.canViewSensitive}
       />
+
+      {vm.relations && (
+        <CustomerRelationsPanel
+          customer={vm.customer}
+          relations={vm.relations}
+          onOpen={(refId) => navigate(`/customers/${refId}`)}
+        />
+      )}
 
       <DuplicatePanel
         title="この顧客の重複候補"

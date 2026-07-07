@@ -363,6 +363,55 @@ reviews and, on approval, the payload is applied to the target master.
   segregation checkbox and everyone a read-only history, and surfaces the post-submit
   notice from `useLocation().state`. Route `/approvals` + `AppShell` nav entry「承認」.
 
+### Hierarchy & relationships (Issue #7)
+
+Two complementary hierarchies, both driven by **one pure, cycle-safe policy** so no
+per-entity tree code is duplicated: **customer org relationships** (parent company →
+subsidiary/branch/group) and a **product category master** (a reference tree products
+attach to). Additive & backward-compatible — every hierarchy column is optional, so
+existing records and the CSV round-trip are untouched.
+
+- **The tree logic is a single reusable policy.** `src/domain/policies/hierarchy-policy.ts`
+  operates on the minimal shape `HasHierarchy = { id; parentId? }` and is pure:
+  `childrenOf` / `rootsOf` / `ancestorsOf` (nearest→root) / `descendantIds` /
+  `subtreeIds` / `siblingsOf` / `parentCandidates` (self + descendants excluded) /
+  **`wouldCreateCycle`** / `buildForest` → `flattenForest` (depth-annotated rows).
+  Any model that satisfies `HasHierarchy` (both `Customer` and `Category` do) gets the
+  whole tree toolkit for free. **20 unit tests** lock the edge cases (dangling parent →
+  treated as root, cycle detection, ordering). When adding a third hierarchy, reuse this
+  policy — do **not** write bespoke traversal.
+- **Customer relationships are two optional columns.** `Customer.parentId?` +
+  `Customer.relationType?` (`headquarters`/`subsidiary`/`branch`/`group`, JP labels in
+  `customer.ts`) threaded end-to-end: entity → mapper (`toCustomer`/`customerInputToFields`
+  normalize blank→undefined) → form parent-picker → detail「関連・階層」panel → list
+  ancestor/rollup filter. 5 mapper tests cover the parentId/relationType round-trip.
+- **The product category master is its own entity + domain model.** New
+  `rayfin/data/ProductCategory.ts` (`@authenticated('*')`, registered in `schema.ts`):
+  id/code(unique)/name/parentId?/description?/audit. **Naming caution:** a *flat*
+  `ProductCategory` union (electronics/apparel/…) already exists in `product.ts` for the
+  legacy `Product.category` `@set`; to avoid the collision the **domain model is named
+  `Category`** (`src/domain/models/category.ts`), and the mapper imports the entity as
+  `ProductCategoryEntity`. The legacy flat `Product.category` stays as-is; a **new optional
+  `Product.categoryId?`** references the `Category` master (the backward-compatible
+  migration path). 6 category-mapper tests cover the round-trip.
+- **Category CRUD lives in one management VM.** `src/usecase/categories/use-category-management-page.ts`
+  composes `useCategories()` (store, mirrors `use-customers.ts`) + `useProducts()` (for the
+  delete guard's product-reference count) + `useAuth().actor`. It builds the flattened tree
+  rows, offers cycle-safe parent options (`parentCandidates` on edit), and **guards delete**
+  when a node has children **or** referencing products (`canDelete`/`deleteBlockReason`).
+  RBAC reuses `canModifyAny(actor)` (admin+steward; viewers read-only) — the category master
+  needs no status/merge/approval. Code-uniqueness is pre-checked for a friendly message before
+  the entity's `unique` constraint fires.
+- **Render-only hierarchy UI, reusable picker.** `components/shared/ParentPicker.tsx` (a
+  render-only `SelectField` wrapper that prepends a「親なし」root option; usable by any
+  hierarchy) + `components/category/HierarchyTree.tsx` (depth-indented rows with child/product
+  counts and manage actions gated by `canManage`, delete disabled with reason tooltip) +
+  `components/category/CategoryForm.tsx` (code/name/ParentPicker/description). Thin
+  `pages/CategoryManagementPage.tsx` + route `/categories` + `AppShell` nav「カテゴリ管理」.
+  The product form gains an optional category-master picker (`categoryOptions`, indented) and
+  the product detail shows the root→self「カテゴリ階層」breadcrumb (`categoryPath`) — both
+  computed in the product VMs via `ancestorsOf`, never in the view.
+
 ### Deployment (Fabric)
 
 The PoC is deployed to Microsoft Fabric. Deploy with `npx rayfin up -y` from the
@@ -482,17 +531,18 @@ npm run seed        # → scripts/seed.mjs
 ### Roadmap & coverage (planned enhancements)
 
 The PoC is measured against the **12-domain general MDM functional requirements**
-laid out at project kickoff. Current breadth is **~72–75%** (core/MVP scope
+laid out at project kickoff. Current breadth is **~80–83%** (core/MVP scope
 ~90%). Coverage by domain:
 
-- ✅ **Implemented (9):** データモデリング / データ品質 / 検索・参照 / 分析・レポート /
+- ✅ **Implemented (10):** データモデリング / データ品質 / 検索・参照 / 分析・レポート /
   バージョン管理（変更履歴・フィールド差分・ロールバック, #5） /
   名寄せ（重複検出＋マージ実行・survivorship・ゴールデンレコード・統合解除, #4） /
   オンボーディング（手動フォーム＋CSV一括インポート/エクスポート・行検証プレビュー, #6） /
   セキュリティ（ロールベース認可・スチュワード行レベル制御・機密項目マスキング, クライアント側, #9） /
-  ワークフロー・承認（maker-checker・承認キュー・職務分掌トグル・差分プレビュー, #8）.
+  ワークフロー・承認（maker-checker・承認キュー・職務分掌トグル・差分プレビュー, #8） /
+  階層・関係管理（顧客組織関係＋製品カテゴリマスタ・循環防止・ドリルダウン, #7）.
 - 🔶 **Partial (1):** ガバナンス (steward + lifecycle).
-- ❌ **Not implemented (2):** 階層・関係管理 / 配信・連携.
+- ❌ **Not implemented (1):** 配信・連携.
 
 **Tracking:** the coverage matrix and roadmap live in **Epic #3**
 (`[Epic] MDM機能カバレッジと不足機能の実装ロードマップ`) — the single source of
@@ -504,7 +554,7 @@ clean-architecture layer map above):
 | P1 | #4  | 名寄せ: マージ実行・survivorship・ゴールデンレコード ✅ **done** | `matching` |
 | P1 | #5  | 変更履歴・バージョン管理（フィールド差分・タイムライン） ✅ **done** | `versioning` |
 | P1 | #6  | 一括インポート/エクスポート（CSV） ✅ **done** | `onboarding` |
-| P2 | #7  | 階層・関係管理（企業グループ／製品カテゴリ／顧客拠点） | `hierarchy` |
+| P2 | #7  | 階層・関係管理（企業グループ／製品カテゴリ／顧客拠点） ✅ **done** | `hierarchy` |
 | P2 | #8  | 変更承認ワークフロー（maker-checker） ✅ **done** | `workflow` |
 | P2 | #9  | ロールベース認可・行レベルセキュリティ（@role/RLS） ✅ **done** (client-side) | `security` |
 | P2 | #10 | スチュワードシップ・ワークキュー | `governance` |

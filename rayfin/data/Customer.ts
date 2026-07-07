@@ -47,6 +47,16 @@ export class Customer {
   @text({ max: 200, optional: true }) website?: string;
   @text({ max: 40, optional: true }) taxId?: string;
 
+  /**
+   * Parent customer id for org-group / head-office ↔ branch hierarchies
+   * (Issue #7). Stored as text (not a declared FK) since the app resolves the
+   * tree in memory; cycle prevention is enforced in the domain policy.
+   */
+  @text({ max: 60, optional: true }) parentId?: string;
+
+  /** Nature of the link to the parent (本社/子会社/拠点/グループ). */
+  @text({ max: 20, optional: true }) relationType?: string;
+
   /** Estimated annual revenue (for segmentation / demo analytics). */
   @decimal({ optional: true }) annualRevenue?: number;
 
