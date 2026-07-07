@@ -154,10 +154,15 @@ Two workflows in `.github/workflows/` automate quality gates and deployment.
   values — it is purely a compile/bundle gate; the value-injected build happens
   at deploy time. Call the tools directly (not `npm run build`) to skip the
   `prebuild` → `rayfin env` hook.
-- **`deploy.yml` — continuous deployment.** Triggers on push to `main` (and
-  manual dispatch), pinned to the `production` environment. Re-runs the same
-  gates (fail-fast), then deploys to Fabric and smoke-tests the live URL
-  (HTTP 200, with retries for CDN propagation).
+- **`deploy.yml` — release deployment.** Triggers on pushing a **semantic
+  version tag** `vX.Y.Z` (e.g. `v1.2.3`; and manual dispatch), pinned to the
+  `production` environment. Re-runs the same gates (fail-fast), then deploys to
+  Fabric and smoke-tests the live URL (HTTP 200, with retries for CDN
+  propagation). A plain push to `main` does **not** deploy — cut a release by
+  tagging: `git tag v1.2.3 && git push origin v1.2.3`. Keeping
+  `environment: production` means the OIDC subject stays
+  `…:environment:production` regardless of tag name, so the existing federated
+  credential matches (no per-tag credential needed).
 
 **Auth model — GitHub OIDC, no stored secret** (the repo is public, so a
 long-lived client secret is deliberately avoided):
