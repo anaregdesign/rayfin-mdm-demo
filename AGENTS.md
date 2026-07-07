@@ -568,6 +568,54 @@ HTTP egress happens on the live Fabric demo.
   lock the active-only selection, filtering, payload/export/JSON shapes, `signPayload`
   determinism, and the mapper round-trip/guards.
 
+### Analytics & reporting (Issue #13)
+
+**Analytics enhancement** deepens the dashboard with a **quality trend
+time-series**, **KPI drill-down** into filtered list views, **per-group
+breakdowns** (by master / steward / product category), and **report export**
+(CSV + browser print). It is pure composition of the existing quality /
+duplicate / validation policies over the current in-memory records — **no new
+persisted entity**. (Historical trend points are derived from each record's
+`createdAt` cohort, since the PoC has no per-day quality snapshot store; this is
+documented as the honest PoC limitation.)
+
+- **All analytics math is a pure policy.** `src/domain/policies/analytics-policy.ts`
+  is the single source of truth: `buildQualityTrend(records, window, now)`
+  (cumulative-cohort avg quality + active ratio per day, clamped to
+  `MAX_TREND_DAYS=365`, `now` injected for determinism); `groupBreakdown(items,
+  keyOf)` → `GroupBreakdown[]` (count + avg quality + low-quality count per
+  group); `reportToMatrix(sections)` flattens `ReportSection[]` → a CSV matrix.
+  `src/domain/models/analytics.ts` owns the vocabulary: `TrendWindowDays`
+  (7/30/90/0=all) + `TREND_WINDOW_VALUES`/`trendWindowLabel`, `QualityTrendPoint`,
+  `GroupBreakdown`, and the drill-down contract `DrilldownFilter {entity, status?,
+  quality?:'low'}` + `describeDrilldown`. No IO/SDK/DOM. **16 unit tests**
+  (`analytics-policy.test.ts`).
+- **Drill-down is router state, resolved by the list page.** A dashboard KPI card
+  (`StatCard` now takes an optional `onClick` → renders a `<button>`) calls
+  `navigate('/customers'|'/products', { state: { drilldown: { entity, quality:'low' } } })`.
+  The list page reads `useLocation().state?.drilldown`, keeps only its own
+  entity, maps it via a local `toSeed()` → `Partial<*ListFilters>`, and passes it
+  as the list VM's `seed` (the VM lazily initialises its filters from the seed
+  **once**). A sky drill-down banner (`describeDrilldown` + a「すべて表示」clear
+  button) resets the filters and `navigate(pathname, {replace:true})` to drop the
+  state. The **quality quick-filter** (`quality: 'all'|'low'`, band = low) lives on
+  both list selectors + filter components (品質 select) so the drill-down and the
+  manual filter share one code path. **8 unit tests** (customer/product
+  `selectors.test.ts`) lock the `band === 'low'` filter + unfiltered `total`.
+- **Report output isolates the DOM in the usecase layer.**
+  `src/usecase/analytics/use-report-export.ts` (`useReportExport(sections)`) turns
+  the dashboard's pure `reportSections: ReportSection[]` into a downloadable CSV
+  (via the shared `useCsvExport().exportMatrix` + `reportToMatrix`) and exposes
+  `window.print()` — so `components/analytics/ReportExportButton` stays render-only.
+- **The dashboard hook is the composition point.** `use-dashboard.ts` builds
+  `trend` (with `trendWindow`/`setTrendWindow`), `entityBreakdown` /
+  `stewardBreakdown` / `categoryBreakdown`, and `reportSections` inside `useMemo`s
+  over the loaded customers/products; the `DashboardPage` renders the trend section
+  (window `SelectField` + `QualityTrendChart` + `ReportExportButton`), three
+  `BreakdownTable`s, and the clickable 低品質 KPIs. Components in
+  `components/analytics/` (`QualityTrendChart` dependency-free SVG, `BreakdownTable`,
+  `ReportExportButton`) are all render-only.
+
 ### Deployment (Fabric)
 
 The PoC is deployed to Microsoft Fabric. Deploy with `npx rayfin up -y` from the
@@ -687,10 +735,10 @@ npm run seed        # → scripts/seed.mjs
 ### Roadmap & coverage (planned enhancements)
 
 The PoC is measured against the **12-domain general MDM functional requirements**
-laid out at project kickoff. Current breadth is **~95–98%** (core/MVP scope
-~98%). Coverage by domain:
+laid out at project kickoff. Current breadth is **~100%** (all 12 domains
+implemented for the PoC scope). Coverage by domain:
 
-- ✅ **Implemented (12):** データモデリング / データ品質（標準化・クレンジング・是正キュー・項目別品質内訳, #11） / 検索・参照 / 分析・レポート /
+- ✅ **Implemented (12):** データモデリング / データ品質（標準化・クレンジング・是正キュー・項目別品質内訳, #11） / 検索・参照 / 分析・レポート（品質トレンド時系列・KPIドリルダウン・構成別内訳・CSV/印刷レポート出力, #13） /
   バージョン管理（変更履歴・フィールド差分・ロールバック, #5） /
   名寄せ（重複検出＋マージ実行・survivorship・ゴールデンレコード・統合解除, #4） /
   オンボーディング（手動フォーム＋CSV一括インポート/エクスポート・行検証プレビュー, #6） /
@@ -699,7 +747,7 @@ laid out at project kickoff. Current breadth is **~95–98%** (core/MVP scope
   階層・関係管理（顧客組織関係＋製品カテゴリマスタ・循環防止・ドリルダウン, #7） /
   ガバナンス・スチュワードシップ（品質・重複・滞留・必須未入力を横断集約した優先度付きワークキュー＋担当者別ワークロード, #10） /
   配信・連携（アウトボックス・イベントフィード・CSV/JSONエクスポート・Webhook（PoCは送信ログのみ）, #12）.
-- ❌ **Not implemented (0)** — 残るギャップは #13 分析強化（品質トレンド・時系列）の深掘りのみ。
+- ❌ **Not implemented (0)** — 全ギャップ #4–#13 を実装完了。残るのは各機能の本番強化（例: #9 の @role/RLS 本番経路、#12 の HMAC 署名・実 HTTP 送信、#13 の日次品質スナップショット蓄積）のみ。
 
 **Tracking:** the coverage matrix and roadmap live in **Epic #3**
 (`[Epic] MDM機能カバレッジと不足機能の実装ロードマップ`) — the single source of
@@ -717,7 +765,7 @@ clean-architecture layer map above):
 | P2 | #10 | スチュワードシップ・ワークキュー ✅ **done** | `governance` |
 | P3 | #11 | データ品質ルール拡張（標準化・クレンジング・是正キュー） ✅ **done** | `quality` |
 | P3 | #12 | 配信・連携（下流公開・Webhook/イベント・API） ✅ **done** | `distribution` |
-| P3 | #13 | 分析強化（品質トレンド・時系列・レポート出力） | `analytics` |
+| P3 | #13 | 分析強化（品質トレンド・時系列・レポート出力） ✅ **done** | `analytics` |
 
 When picking up feature work: start from the relevant child issue, follow its
 per-layer plan and the **Layer map** / **Conventions** above, keep new copy in

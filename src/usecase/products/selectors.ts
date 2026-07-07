@@ -11,17 +11,25 @@ import { includesNormalized } from '@/lib/text';
 
 export type ProductSortKey = 'updated' | 'name' | 'sku' | 'price' | 'quality';
 export type ProductStatusFilter = ProductStatus | 'all';
+/** Quality quick filter (Issue #13 drill-down target). */
+export type ProductQualityFilter = 'all' | 'low';
 
 export interface ProductListFilters {
   search: string;
   status: ProductStatusFilter;
   sort: ProductSortKey;
+  /**
+   * Quality quick filter (Issue #13): `'low'` restricts the list to
+   * low-quality (band = low) records — the target of a dashboard drill-down.
+   */
+  quality: ProductQualityFilter;
 }
 
 export const DEFAULT_PRODUCT_FILTERS: ProductListFilters = {
   search: '',
   status: 'all',
   sort: 'updated',
+  quality: 'all',
 };
 
 /** Row view-model: the record plus its derived quality and duplicate flag. */
@@ -94,6 +102,7 @@ export function buildProductListView(
       quality: evaluateProductQuality(product),
       isDuplicate: dupIds.has(product.id),
     }))
+    .filter((item) => filters.quality === 'all' || item.quality.band === 'low')
     .sort((a, b) => compareBySort(a, b, filters.sort));
 
   return {

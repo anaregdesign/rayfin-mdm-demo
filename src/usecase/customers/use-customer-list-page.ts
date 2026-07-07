@@ -17,13 +17,16 @@ import { useAuth } from '@/usecase/auth/use-auth';
 import { toMessage } from '@/lib/errors';
 
 import { useCustomers } from './use-customers';
+import type {
+  CustomerListFilters,
+  CustomerListView,
+  CustomerSortKey,
+  CustomerStatusFilter,
+  CustomerQualityFilter,
+} from './selectors';
 import {
   buildCustomerListView,
   DEFAULT_CUSTOMER_FILTERS,
-  type CustomerListFilters,
-  type CustomerListView,
-  type CustomerSortKey,
-  type CustomerStatusFilter,
 } from './selectors';
 
 /** An indented option for the hierarchy rollup filter / parent pickers. */
@@ -47,6 +50,8 @@ export interface CustomerListPageViewModel {
   setSort: (sort: CustomerSortKey) => void;
   /** Restrict the list to a customer + its descendants (empty = all). */
   setAncestor: (id: string) => void;
+  /** Toggle the low-quality quick filter (Issue #13 drill-down). */
+  setQuality: (quality: CustomerQualityFilter) => void;
   changeStatus: (id: string, status: CustomerStatus) => Promise<void>;
   deleteCustomer: (id: string) => Promise<void>;
   reload: () => Promise<void>;
@@ -64,12 +69,15 @@ export interface CustomerListPageViewModel {
 }
 
 /** Orchestrates the customer list screen: filters, derived view, row actions. */
-export function useCustomerListPage(): CustomerListPageViewModel {
+export function useCustomerListPage(
+  seed?: Partial<CustomerListFilters>
+): CustomerListPageViewModel {
   const store = useCustomers();
   const { actor } = useAuth();
-  const [filters, setFilters] = useState<CustomerListFilters>(
-    DEFAULT_CUSTOMER_FILTERS
-  );
+  const [filters, setFilters] = useState<CustomerListFilters>(() => ({
+    ...DEFAULT_CUSTOMER_FILTERS,
+    ...seed,
+  }));
   const [actionError, setActionError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -128,6 +136,10 @@ export function useCustomerListPage(): CustomerListPageViewModel {
     (ancestorId: string) => setFilters((f) => ({ ...f, ancestorId })),
     []
   );
+  const setQuality = useCallback(
+    (quality: CustomerQualityFilter) => setFilters((f) => ({ ...f, quality })),
+    []
+  );
 
   const changeStatus = useCallback(
     async (id: string, status: CustomerStatus) => {
@@ -171,6 +183,7 @@ export function useCustomerListPage(): CustomerListPageViewModel {
     setStatusFilter,
     setSort,
     setAncestor,
+    setQuality,
     changeStatus,
     deleteCustomer,
     reload: store.reload,

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 import { CustomerFilters } from '@/components/customer/CustomerFilters';
 import { CustomerTable } from '@/components/customer/CustomerTable';
@@ -11,17 +11,46 @@ import { ErrorState } from '@/components/shared/ErrorState';
 import { LoadingState } from '@/components/shared/LoadingState';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatCard } from '@/components/shared/StatCard';
+import {
+  describeDrilldown,
+  type DrilldownFilter,
+} from '@/domain/models/analytics';
+import type {
+  CustomerListFilters,
+  CustomerStatusFilter,
+} from '@/usecase/customers/selectors';
 import { useCustomerListPage } from '@/usecase/customers/use-customer-list-page';
+
+/** Map a dashboard drill-down to the customer list's seed filters. */
+function toSeed(drilldown?: DrilldownFilter): Partial<CustomerListFilters> | undefined {
+  if (!drilldown || drilldown.entity !== 'customer') return undefined;
+  const seed: Partial<CustomerListFilters> = {};
+  if (drilldown.status) seed.status = drilldown.status as CustomerStatusFilter;
+  if (drilldown.quality) seed.quality = drilldown.quality;
+  return seed;
+}
 
 /** Customer master list: search/filter/sort, KPIs, and row navigation. */
 export function CustomerListPage() {
-  const vm = useCustomerListPage();
+  const location = useLocation();
   const navigate = useNavigate();
+  const drilldown = (location.state as { drilldown?: DrilldownFilter } | null)
+    ?.drilldown;
+  const scoped = drilldown?.entity === 'customer' ? drilldown : undefined;
+  const vm = useCustomerListPage(toSeed(scoped));
   const [importOpen, setImportOpen] = useState(false);
 
   const closeImport = () => {
     setImportOpen(false);
     vm.importer.reset();
+  };
+
+  const clearDrilldown = () => {
+    vm.setStatusFilter('all');
+    vm.setQuality('all');
+    vm.setSearch('');
+    vm.setAncestor('');
+    navigate(location.pathname, { replace: true });
   };
 
   return (
@@ -49,6 +78,22 @@ export function CustomerListPage() {
         }
       />
 
+      {scoped && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm text-sky-900">
+          <span>
+            ダッシュボードから絞り込み中:{' '}
+            <strong>{describeDrilldown(scoped)}</strong>
+          </span>
+          <button
+            type="button"
+            onClick={clearDrilldown}
+            className="font-medium text-sky-700 underline decoration-dotted hover:text-sky-900"
+          >
+            すべて表示
+          </button>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <StatCard label="総顧客数" value={vm.view.total} />
         <StatCard label="表示中" value={vm.view.filteredCount} />
@@ -64,11 +109,13 @@ export function CustomerListPage() {
         status={vm.filters.status}
         sort={vm.filters.sort}
         ancestor={vm.filters.ancestorId}
+        quality={vm.filters.quality}
         hierarchyOptions={vm.hierarchyOptions}
         onSearch={vm.setSearch}
         onStatusFilter={vm.setStatusFilter}
         onSort={vm.setSort}
         onAncestor={vm.setAncestor}
+        onQuality={vm.setQuality}
       />
 
       {vm.actionError && <ErrorState message={vm.actionError} />}
