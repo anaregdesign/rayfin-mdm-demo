@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { to: '/customers', label: '顧客マスタ', end: false },
   { to: '/products', label: '製品マスタ', end: false },
   { to: '/categories', label: 'カテゴリ管理', end: false },
+  { to: '/workqueue', label: 'ワークキュー', end: false },
   { to: '/approvals', label: '承認', end: false },
   { to: '/guide', label: 'MDMガイド', end: false },
 ];
