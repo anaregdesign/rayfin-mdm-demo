@@ -23,6 +23,7 @@ import { ProductDetailPage } from '@/pages/ProductDetailPage';
 import { ProductFormPage } from '@/pages/ProductFormPage';
 import { ProductListPage } from '@/pages/ProductListPage';
 import { WorkQueuePage } from '@/pages/WorkQueuePage';
+import { RemediationPage } from '@/pages/RemediationPage';
 import { useAuth } from '@/usecase/auth/use-auth';
 
 function FullScreenLoading() {
@@ -98,6 +99,7 @@ export default function App() {
           <Route path="/products/:id/edit" element={<ProductFormPage />} />
           <Route path="/categories" element={<CategoryManagementPage />} />
           <Route path="/workqueue" element={<WorkQueuePage />} />
+          <Route path="/remediation" element={<RemediationPage />} />
           <Route path="/approvals" element={<ApprovalPage />} />
           <Route path="/guide" element={<GuidePage />} />
         </Route>

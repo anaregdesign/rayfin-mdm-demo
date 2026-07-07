@@ -6,6 +6,7 @@ import type { DuplicatePair } from '@/domain/models/duplicate';
 import type { StewardWorkload } from '@/domain/models/steward-task';
 import { findCustomerDuplicates } from '@/domain/policies/duplicate-policy';
 import { findProductDuplicates } from '@/domain/policies/duplicate-policy';
+import { deriveRemediationTargets } from '@/domain/policies/cleansing-policy';
 import {
   deriveStewardTasks,
   stewardWorkloads,
@@ -33,6 +34,10 @@ export interface DashboardViewModel {
   productDuplicates: DuplicatePair[];
   /** Per-steward open-task load across both masters (Issue #10). */
   stewardWorkloads: StewardWorkload[];
+  /** Records needing standardization/cleansing or below quality bar (Issue #11). */
+  remediationCount: number;
+  /** Subset of `remediationCount` that has at least one cleansing suggestion. */
+  cleansingSuggestionCount: number;
 }
 
 /** Aggregates both masters into the analytics view shown on the dashboard. */
@@ -75,6 +80,11 @@ export function useDashboard(): DashboardViewModel {
     [customers.customers, products.products]
   );
 
+  const remediationTargets = useMemo(
+    () => deriveRemediationTargets(customers.customers, products.products),
+    [customers.customers, products.products]
+  );
+
   return {
     loading: customers.loading || products.loading,
     error: customers.error ?? products.error,
@@ -85,5 +95,9 @@ export function useDashboard(): DashboardViewModel {
     customerDuplicates,
     productDuplicates,
     stewardWorkloads: stewardLoads,
+    remediationCount: remediationTargets.length,
+    cleansingSuggestionCount: remediationTargets.filter(
+      (t) => t.suggestions.length > 0
+    ).length,
   };
 }

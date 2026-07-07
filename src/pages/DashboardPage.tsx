@@ -1,9 +1,11 @@
 import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 import { DuplicatePanel } from '@/components/shared/DuplicatePanel';
 import { ErrorState } from '@/components/shared/ErrorState';
 import { LoadingState } from '@/components/shared/LoadingState';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { StatCard } from '@/components/shared/StatCard';
 import { QualityOverview } from '@/components/dashboard/QualityOverview';
 import { RecentActivity } from '@/components/dashboard/RecentActivity';
 import { StatusBreakdown } from '@/components/dashboard/StatusBreakdown';
@@ -58,6 +60,34 @@ export function DashboardPage() {
         workloads={vm.stewardWorkloads}
         description="品質・重複・下書き滞留・必須未入力などで対応が必要なレコードの担当者別件数です。詳細はワークキューを参照してください。"
       />
+
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">
+            データ品質・是正
+          </h2>
+          <Link
+            to="/remediation"
+            className="text-sm font-medium text-sky-700 underline decoration-dotted hover:text-sky-900"
+          >
+            是正キューを開く →
+          </Link>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <StatCard
+            label="是正対象件数"
+            value={vm.remediationCount}
+            hint="標準化候補・低品質・必須未入力のいずれかに該当するレコード"
+            accent={vm.remediationCount > 0 ? 'warning' : 'positive'}
+          />
+          <StatCard
+            label="標準化候補あり"
+            value={vm.cleansingSuggestionCount}
+            hint="表記ゆれを自動修正できるレコード（ワンクリックで適用可能）"
+            accent={vm.cleansingSuggestionCount > 0 ? 'warning' : 'positive'}
+          />
+        </div>
+      </section>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <RecentActivity
