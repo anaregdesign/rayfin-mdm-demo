@@ -2,6 +2,12 @@ name: Deploy to Fabric
 
 # Continuous deployment to Microsoft Fabric.
 #
+# Triggered by pushing a semantic version tag (vX.Y.Z, e.g. v1.2.3). A plain
+# push to main no longer deploys — cut a release by tagging the commit you want
+# live. `environment: production` is kept, so the OIDC subject stays
+# `repo:<owner>/<repo>:environment:production` regardless of the tag name and
+# matches the existing federated credential (no per-tag credential needed).
+#
 # Auth model (no stored client secret — the repo is public):
 #   GitHub OIDC  ->  azure/login (federated credential on the Entra app)
 #   ->  az account get-access-token (Fabric resource, app-only)
@@ -14,7 +20,8 @@ name: Deploy to Fabric
 # tenant setting plus its Admin role on the target workspace.
 on:
   push:
-    branches: [main]
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'   # semantic version tags, e.g. v1.2.3
   workflow_dispatch:
 
 # Never cancel a deploy that is already in flight (avoid partial state); queue
