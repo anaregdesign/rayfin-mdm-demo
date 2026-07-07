@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 
 import { CustomerDetailCard } from '@/components/customer/CustomerDetailCard';
 import { CustomerStatusActions } from '@/components/customer/CustomerStatusActions';
+import { HistoryTimeline } from '@/components/history/HistoryTimeline';
 import { Button } from '@/components/shared/Button';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DuplicatePanel } from '@/components/shared/DuplicatePanel';
@@ -89,6 +90,15 @@ export function CustomerDetailPage() {
             </button>
           )
         }
+      />
+
+      <HistoryTimeline
+        entityType="customer"
+        entries={vm.history}
+        loading={vm.historyLoading}
+        error={vm.historyError}
+        busy={vm.busy}
+        onRestore={vm.restore}
       />
 
       <ConfirmDialog

@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 
-import type { Customer } from '@/domain/models/customer';
+import type { ChangeEntry } from '@/domain/models/change-log';
+import { customerToInput, type Customer } from '@/domain/models/customer';
 import type { CustomerStatus } from '@/domain/models/master-status';
 import type { DuplicatePair } from '@/domain/models/duplicate';
 import type { QualityResult } from '@/domain/models/quality';
@@ -9,12 +10,14 @@ import {
   pairsForId,
 } from '@/domain/policies/duplicate-policy';
 import { evaluateCustomerQuality } from '@/domain/policies/customer-quality-policy';
+import { revertChanges } from '@/domain/policies/diff-policy';
 import {
   allowedCustomerTransitions,
   canDeleteCustomer,
   canEditCustomer,
 } from '@/domain/policies/customer-status-policy';
 import { toMessage } from '@/lib/errors';
+import { useChangeHistory } from '@/usecase/history/use-change-history';
 
 import { useCustomers } from './use-customers';
 
@@ -29,8 +32,12 @@ export interface CustomerDetailViewModel {
   allowedTransitions: CustomerStatus[];
   canEdit: boolean;
   canDelete: boolean;
+  history: ChangeEntry[];
+  historyLoading: boolean;
+  historyError: string | null;
   changeStatus: (status: CustomerStatus) => Promise<void>;
   deleteCustomer: () => Promise<boolean>;
+  restore: (entry: ChangeEntry) => Promise<void>;
 }
 
 /** Orchestrates the 360° customer detail screen and its lifecycle actions. */
@@ -91,6 +98,25 @@ export function useCustomerDetailPage(id: string): CustomerDetailViewModel {
     }
   }, [store, customer]);
 
+  const history = useChangeHistory('customer', id, customer?.updatedAt?.getTime());
+
+  const restore = useCallback(
+    async (entry: ChangeEntry) => {
+      if (!customer || entry.changes.length === 0) return;
+      setActionError(null);
+      setBusy(true);
+      try {
+        const reverted = revertChanges(customerToInput(customer), entry.changes);
+        await store.updateCustomer(customer.id, reverted);
+      } catch (err) {
+        setActionError(toMessage(err));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [store, customer]
+  );
+
   return {
     loading: store.loading,
     error: store.error,
@@ -102,7 +128,11 @@ export function useCustomerDetailPage(id: string): CustomerDetailViewModel {
     allowedTransitions,
     canEdit,
     canDelete,
+    history: history.entries,
+    historyLoading: history.loading,
+    historyError: history.error,
     changeStatus,
     deleteCustomer,
+    restore,
   };
 }
