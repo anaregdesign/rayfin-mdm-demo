@@ -13,6 +13,11 @@ import {
 } from '@/domain/policies/duplicate-policy';
 import { ancestorsOf } from '@/domain/policies/hierarchy-policy';
 import { evaluateProductQuality } from '@/domain/policies/product-quality-policy';
+import {
+  applyCleansing,
+  suggestProductCleansing,
+} from '@/domain/policies/cleansing-policy';
+import type { CleansingSuggestion } from '@/domain/models/quality';
 import { revertChanges } from '@/domain/policies/diff-policy';
 import {
   allowedProductTransitions,
@@ -44,6 +49,8 @@ export interface ProductDetailViewModel {
   busy: boolean;
   product: Product | null;
   quality: QualityResult | null;
+  /** Normalization suggestions for this record (Issue #11). */
+  cleansingSuggestions: CleansingSuggestion[];
   duplicatePairs: DuplicatePair[];
   /** Breadcrumb of the assigned category master node (root → self), if any. */
   categoryPath: string | null;
@@ -62,6 +69,8 @@ export interface ProductDetailViewModel {
   changeStatus: (status: ProductStatus) => Promise<void>;
   deleteProduct: () => Promise<boolean>;
   restore: (entry: ChangeEntry) => Promise<void>;
+  /** Apply all normalization suggestions to this record (Issue #11). */
+  applyCleansing: () => Promise<void>;
   planMerge: (loserId: string) => MergePlan | null;
   confirmMerge: (
     loserId: string,
@@ -86,6 +95,11 @@ export function useProductDetailPage(id: string): ProductDetailViewModel {
 
   const quality = useMemo(
     () => (product ? evaluateProductQuality(product) : null),
+    [product]
+  );
+
+  const cleansingSuggestions = useMemo(
+    () => (product ? suggestProductCleansing(productToInput(product)) : []),
     [product]
   );
 
@@ -172,6 +186,23 @@ export function useProductDetailPage(id: string): ProductDetailViewModel {
     },
     [store, product]
   );
+
+  const applyCleansingAll = useCallback(async () => {
+    if (!product || cleansingSuggestions.length === 0) return;
+    setActionError(null);
+    setBusy(true);
+    try {
+      const cleansed = applyCleansing(
+        productToInput(product),
+        cleansingSuggestions
+      );
+      await store.updateProduct(product.id, cleansed);
+    } catch (err) {
+      setActionError(toMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }, [store, product, cleansingSuggestions]);
 
   const mergeGateways = useMemo<MergeGateways>(
     () => ({
@@ -260,6 +291,7 @@ export function useProductDetailPage(id: string): ProductDetailViewModel {
     busy,
     product,
     quality,
+    cleansingSuggestions,
     duplicatePairs,
     categoryPath,
     allowedTransitions,
@@ -277,6 +309,7 @@ export function useProductDetailPage(id: string): ProductDetailViewModel {
     changeStatus,
     deleteProduct,
     restore,
+    applyCleansing: applyCleansingAll,
     planMerge,
     confirmMerge,
     unmerge: mergeCtl.unmerge,

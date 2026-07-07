@@ -453,6 +453,58 @@ rules evolve.
   existing `findCustomerDuplicates` call there) and `DashboardPage` renders
   `StewardWorkloadTable` — the queue and the dashboard never diverge.
 
+### Data quality rules & cleansing (Issue #11)
+
+**Standardization / cleansing** proposes normalized replacements for individual
+fields, surfaces a **per-field quality breakdown** on the detail pages, and rolls
+records needing attention into a prioritized **是正キュー (remediation queue)**. It
+reuses the existing quality + validation policies — there is **no new persisted
+entity** — so it stays correct as those rules evolve.
+
+- **Normalizers are pure & idempotent.** `src/lib/normalize.ts` holds the
+  framework-free primitives (`toNfkc`, `normalizeName`, `normalizeEmail`,
+  `normalizePhone`, `normalizePostalCode`, `normalizeBarcode`, `normalizeUrl`).
+  Every one satisfies `f(f(x)) === f(x)` so a suggestion can be re-applied safely.
+  **Any new cleansing primitive MUST be pure, live here, and add an idempotency
+  test** (`src/lib/__tests__/normalize.test.ts`).
+- **One rule table drives both suggest and apply.** `src/domain/policies/cleansing-policy.ts`
+  defines `CleansingRule<T> { field, label, reason, normalize }` tables per master
+  (`CUSTOMER_RULES` / `PRODUCT_RULES`). `suggest*Cleansing(input)` emits a
+  `CleansingSuggestion { field, label, current, suggested, reason }` **only when the
+  current value is non-empty AND normalization changes it** (clean record → no
+  suggestions). `applyCleansing(input, suggestions)` returns a **non-mutating** shallow
+  copy. Add a field by extending the table — never hand-roll a normalizer at a call site.
+- **The remediation queue is a derived signal, never stored.**
+  `deriveRemediationTargets(customers, products, ctx?)` (+ the per-master
+  `derive{Customer,Product}Remediation`) excludes `merged`/`archived`, and surfaces a
+  record when it has suggestions **OR** validation fails (`missingRequired`) **OR** its
+  quality score is below `ctx.qualityThreshold` (default 50). `RemediationTarget` carries
+  JP-labelled `missingFields`/`issues` (render directly). Ordering (`compareTargets`) is
+  worst-score-first, more-suggestions as tie-break, then stable by id. **19 unit tests**
+  in `cleansing-policy.test.ts` lock suggestion emission, non-mutation, the exclusions,
+  the threshold, `missingRequired`, and the sort order.
+- **Quality policies now expose the breakdown.** `evaluate*Quality` emit
+  `factors: QualityFactor[] { key, label, filled, weight }` + `issueDetails:
+  QualityIssueDetail[] { message, penalty }` alongside the unchanged score/band. The
+  per-field breakdown UI reads `factors`/`issueDetails` — **do not recompute penalties
+  in the view**; extend the policy if a new factor is needed.
+- **Store-agnostic apply controllers (usecase).** `src/usecase/quality/use-cleansing.ts`
+  is the injected apply controller (`apply`/`applyAll`, `applyingId`, `bulkApplying`,
+  `error`, `lastSummary`) guarded by `can(actor, 'edit', record)`;
+  `use-remediation-page.ts` composes `useCustomers` + `useProducts` + `useAuth` +
+  `deriveRemediationTargets` into the `/remediation` VM (entity/`onlyWithSuggestions`
+  filters, `applyAllVisible`). Both detail VMs (`use-*-detail-page.ts`) expose
+  `cleansingSuggestions` + `applyCleansing` so a record can be standardized in place,
+  reusing the detail VM's **own** store (no context store).
+- **Render-only components, one per file.** `components/quality/`:
+  `QualityBreakdownList` (factors grid + issue details), `CleansingSuggestionRow`
+  (current→suggested + reason), `QualityPanel` (breakdown + suggestions + apply-all,
+  rendered on both detail pages after the detail card), `RemediationQueue` (per-row
+  apply + links, used by `pages/RemediationPage.tsx`). Route `/remediation` + `AppShell`
+  nav「是正キュー」; `DashboardPage` adds a「データ品質・是正」rollup (是正対象件数 /
+  標準化候補あり) linking to the queue via `use-dashboard.ts`'s
+  `remediationCount`/`cleansingSuggestionCount`.
+
 ### Deployment (Fabric)
 
 The PoC is deployed to Microsoft Fabric. Deploy with `npx rayfin up -y` from the
@@ -575,7 +627,7 @@ The PoC is measured against the **12-domain general MDM functional requirements*
 laid out at project kickoff. Current breadth is **~90–92%** (core/MVP scope
 ~95%). Coverage by domain:
 
-- ✅ **Implemented (11):** データモデリング / データ品質 / 検索・参照 / 分析・レポート /
+- ✅ **Implemented (11):** データモデリング / データ品質（標準化・クレンジング・是正キュー・項目別品質内訳, #11） / 検索・参照 / 分析・レポート /
   バージョン管理（変更履歴・フィールド差分・ロールバック, #5） /
   名寄せ（重複検出＋マージ実行・survivorship・ゴールデンレコード・統合解除, #4） /
   オンボーディング（手動フォーム＋CSV一括インポート/エクスポート・行検証プレビュー, #6） /
@@ -599,7 +651,7 @@ clean-architecture layer map above):
 | P2 | #8  | 変更承認ワークフロー（maker-checker） ✅ **done** | `workflow` |
 | P2 | #9  | ロールベース認可・行レベルセキュリティ（@role/RLS） ✅ **done** (client-side) | `security` |
 | P2 | #10 | スチュワードシップ・ワークキュー ✅ **done** | `governance` |
-| P3 | #11 | データ品質ルール拡張（標準化・クレンジング・是正キュー） | `quality` |
+| P3 | #11 | データ品質ルール拡張（標準化・クレンジング・是正キュー） ✅ **done** | `quality` |
 | P3 | #12 | 配信・連携（下流公開・Webhook/イベント・API） | `distribution` |
 | P3 | #13 | 分析強化（品質トレンド・時系列・レポート出力） | `analytics` |
 

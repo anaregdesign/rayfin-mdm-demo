@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { CustomerDetailCard } from '@/components/customer/CustomerDetailCard';
 import { CustomerRelationsPanel } from '@/components/customer/CustomerRelationsPanel';
 import { CustomerStatusActions } from '@/components/customer/CustomerStatusActions';
+import { QualityPanel } from '@/components/quality/QualityPanel';
 import { HistoryTimeline } from '@/components/history/HistoryTimeline';
 import { MergeDialog } from '@/components/merge/MergeDialog';
 import { MergeHistoryPanel } from '@/components/merge/MergeHistoryPanel';
@@ -90,6 +91,16 @@ export function CustomerDetailPage() {
         customer={vm.customer}
         quality={vm.quality}
         canViewSensitive={vm.canViewSensitive}
+      />
+
+      <QualityPanel
+        result={vm.quality}
+        suggestions={vm.cleansingSuggestions}
+        canApply={vm.canEdit}
+        busy={vm.busy}
+        onApply={() => {
+          void vm.applyCleansing();
+        }}
       />
 
       {vm.relations && (

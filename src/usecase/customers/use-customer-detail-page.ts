@@ -17,6 +17,11 @@ import {
 } from '@/domain/policies/duplicate-policy';
 import { evaluateCustomerQuality } from '@/domain/policies/customer-quality-policy';
 import {
+  applyCleansing,
+  suggestCustomerCleansing,
+} from '@/domain/policies/cleansing-policy';
+import type { CleansingSuggestion } from '@/domain/models/quality';
+import {
   ancestorsOf,
   childrenOf,
   siblingsOf,
@@ -65,6 +70,8 @@ export interface CustomerDetailViewModel {
   busy: boolean;
   customer: Customer | null;
   quality: QualityResult | null;
+  /** Normalization suggestions for this record (Issue #11). */
+  cleansingSuggestions: CleansingSuggestion[];
   duplicatePairs: DuplicatePair[];
   /** Parent / children / siblings neighbourhood for the relations panel. */
   relations: CustomerRelations | null;
@@ -86,6 +93,8 @@ export interface CustomerDetailViewModel {
   changeStatus: (status: CustomerStatus) => Promise<void>;
   deleteCustomer: () => Promise<boolean>;
   restore: (entry: ChangeEntry) => Promise<void>;
+  /** Apply all normalization suggestions to this record (Issue #11). */
+  applyCleansing: () => Promise<void>;
   /** Build the comparison plan for merging a duplicate into this record. */
   planMerge: (loserId: string) => MergePlan | null;
   /** Execute the merge with the steward's per-field source choices. */
@@ -112,6 +121,11 @@ export function useCustomerDetailPage(id: string): CustomerDetailViewModel {
 
   const quality = useMemo(
     () => (customer ? evaluateCustomerQuality(customer) : null),
+    [customer]
+  );
+
+  const cleansingSuggestions = useMemo(
+    () => (customer ? suggestCustomerCleansing(customerToInput(customer)) : []),
     [customer]
   );
 
@@ -209,6 +223,23 @@ export function useCustomerDetailPage(id: string): CustomerDetailViewModel {
     [store, customer]
   );
 
+  const applyCleansingAll = useCallback(async () => {
+    if (!customer || cleansingSuggestions.length === 0) return;
+    setActionError(null);
+    setBusy(true);
+    try {
+      const cleansed = applyCleansing(
+        customerToInput(customer),
+        cleansingSuggestions
+      );
+      await store.updateCustomer(customer.id, cleansed);
+    } catch (err) {
+      setActionError(toMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }, [store, customer, cleansingSuggestions]);
+
   const mergeGateways = useMemo<MergeGateways>(
     () => ({
       applyGolden: (winnerId, golden) =>
@@ -296,6 +327,7 @@ export function useCustomerDetailPage(id: string): CustomerDetailViewModel {
     busy,
     customer,
     quality,
+    cleansingSuggestions,
     duplicatePairs,
     relations,
     allowedTransitions,
@@ -313,6 +345,7 @@ export function useCustomerDetailPage(id: string): CustomerDetailViewModel {
     changeStatus,
     deleteCustomer,
     restore,
+    applyCleansing: applyCleansingAll,
     planMerge,
     confirmMerge,
     unmerge: mergeCtl.unmerge,

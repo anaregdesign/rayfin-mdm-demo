@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 
 import { ProductDetailCard } from '@/components/product/ProductDetailCard';
 import { ProductStatusActions } from '@/components/product/ProductStatusActions';
+import { QualityPanel } from '@/components/quality/QualityPanel';
 import { HistoryTimeline } from '@/components/history/HistoryTimeline';
 import { MergeDialog } from '@/components/merge/MergeDialog';
 import { MergeHistoryPanel } from '@/components/merge/MergeHistoryPanel';
@@ -89,6 +90,16 @@ export function ProductDetailPage() {
         product={vm.product}
         quality={vm.quality}
         categoryPath={vm.categoryPath}
+      />
+
+      <QualityPanel
+        result={vm.quality}
+        suggestions={vm.cleansingSuggestions}
+        canApply={vm.canEdit}
+        busy={vm.busy}
+        onApply={() => {
+          void vm.applyCleansing();
+        }}
       />
 
       <DuplicatePanel
