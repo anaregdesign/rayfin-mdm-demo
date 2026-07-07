@@ -208,6 +208,58 @@ duplicated.
   safe default) so the history panel never crashes; round-trip tested
   (`infrastructure/data/__tests__/merge-record-mapper.test.ts`).
 
+### Bulk import/export (Issue #6)
+
+Both master lists can round-trip through **CSV** — export the current filtered
+view, or import a file with a per-row validated preview before committing. The
+same clean-architecture rules apply: parsing/serialisation is a pure `lib`
+concern, all business verdicts live in a domain policy, the write orchestration
+(and the only DOM side effect) is in the use case, and the components are
+render-only.
+
+- **Pure CSV codec:** `src/lib/csv.ts` — dependency-free `parseCsv` (RFC-4180:
+  quoted fields, `""` escapes, embedded commas/CR-LF, trailing-newline safe),
+  `toCsv` (CRLF-joined, quotes cells with `",\r\n`), and `recordsFromMatrix`
+  (zips the header row into `Record<string,string>[]`, trims headers/cells, pads
+  ragged rows). No DOM, no SDK. Unit-tested (`src/lib/__tests__/csv.test.ts`).
+- **One field spec drives BOTH directions.** `src/domain/policies/import-policy.ts`
+  defines one ordered `FieldSpec[]` per entity; export maps `entity → cells`
+  (`customerToCsvRow`/`productToCsvRow`, `CUSTOMER_CSV_HEADERS`/
+  `PRODUCT_CSV_HEADERS`) and import maps `cells → draft input`, so the two
+  directions are guaranteed to round-trip. A test asserts
+  `HEADERS.length === toCsvRow(sample).length` to catch schema drift. Enum cells
+  accept the canonical value **or** the Japanese label (`buildEnumParser`);
+  numbers tolerate `, ￥¥$€` separators (`parseNumberCell`). The system-only
+  `merged` status is intentionally **not importable** (excluded from
+  `*_STATUS_VALUES` → parser rejects it).
+- **Per-row verdict is pure.** `evaluateCustomerImport`/`evaluateProductImport`
+  `(records, existing, mode) → ImportPreview` reuses the existing
+  `validate*Input` and `find*MatchesForInput` policies to label each row
+  `ok | warning | error` with an action `insert | update | skip | error`:
+  within-file key dup → error; existing-key match honours the **mode**
+  (`insert` → error, `skip` → skip, `upsert` → update); a new row that resembles
+  an existing record → soft `warning` (still inserts). Models/labels live in
+  `src/domain/models/import.ts` (`ImportMode`/`RowStatus`/`RowAction`/
+  `ImportPreview`/`ImportOutcome` + `summarizeRows`). Fully unit-tested
+  (`domain/policies/__tests__/import-policy.test.ts`).
+- **Use case owns the writes + the download.** `src/usecase/import/use-import.ts`
+  (`useImport(gateways)`) is store-agnostic: it reads the file, re-derives the
+  preview via a `buildPreview` closure whenever the mode changes, then commits
+  row by row through injected `create`/`update`/`reload`. As with merge (#4), the
+  list-page VM injects **its own store's** commands so the screen refreshes after
+  import (the plain `useCustomers()`/`useProducts()` hooks would otherwise
+  desync). `src/usecase/export/use-export.ts` (`useCsvExport`) isolates the Blob
+  + `<a download>` side effect (UTF-8 BOM prepended for Excel-JP) so views stay
+  pure.
+- **View surface:** `components/import/ImportWizard.tsx` (render-only modal
+  mirroring `ConfirmDialog`: file drop/pick, mode radios, a preview table with
+  status badges + messages, summary chips, and the post-commit outcome) +
+  `components/import/ExportButton.tsx`. The list pages hold a local `importOpen`
+  flag and add the エクスポート / インポート / 新規登録 header cluster; the VMs
+  expose `importer` (an `ImportController`), `exportCsv()`, and
+  `downloadTemplate()`. Components may `type`-import from the use case (an
+  established pattern here) but contain no business logic.
+
 ### Deployment (Fabric)
 
 The PoC is deployed to Microsoft Fabric. Deploy with `npx rayfin up -y` from the
@@ -330,11 +382,12 @@ The PoC is measured against the **12-domain general MDM functional requirements*
 laid out at project kickoff. Current breadth is **~45–50%** (core/MVP scope
 ~90%). Coverage by domain:
 
-- ✅ **Implemented (6):** データモデリング / データ品質 / 検索・参照 / 分析・レポート /
+- ✅ **Implemented (7):** データモデリング / データ品質 / 検索・参照 / 分析・レポート /
   バージョン管理（変更履歴・フィールド差分・ロールバック, #5） /
-  名寄せ（重複検出＋マージ実行・survivorship・ゴールデンレコード・統合解除, #4）.
-- 🔶 **Partial (3):** オンボーディング (manual only) / ガバナンス (steward +
-  lifecycle) / セキュリティ (authn only, `@authenticated('*')`).
+  名寄せ（重複検出＋マージ実行・survivorship・ゴールデンレコード・統合解除, #4） /
+  オンボーディング（手動フォーム＋CSV一括インポート/エクスポート・行検証プレビュー, #6）.
+- 🔶 **Partial (2):** ガバナンス (steward + lifecycle) / セキュリティ (authn only,
+  `@authenticated('*')`).
 - ❌ **Not implemented (3):** 階層・関係管理 / ワークフロー・承認 / 配信・連携.
 
 **Tracking:** the coverage matrix and roadmap live in **Epic #3**
@@ -346,7 +399,7 @@ clean-architecture layer map above):
 | --- | ----- | ------------ | ------------- |
 | P1 | #4  | 名寄せ: マージ実行・survivorship・ゴールデンレコード ✅ **done** | `matching` |
 | P1 | #5  | 変更履歴・バージョン管理（フィールド差分・タイムライン） ✅ **done** | `versioning` |
-| P1 | #6  | 一括インポート/エクスポート（CSV） | `onboarding` |
+| P1 | #6  | 一括インポート/エクスポート（CSV） ✅ **done** | `onboarding` |
 | P2 | #7  | 階層・関係管理（企業グループ／製品カテゴリ／顧客拠点） | `hierarchy` |
 | P2 | #8  | 変更承認ワークフロー（maker-checker） | `workflow` |
 | P2 | #9  | ロールベース認可・行レベルセキュリティ（@role/RLS） | `security` |

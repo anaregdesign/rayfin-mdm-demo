@@ -1,5 +1,8 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import { ExportButton } from '@/components/import/ExportButton';
+import { ImportWizard } from '@/components/import/ImportWizard';
 import { ProductFilters } from '@/components/product/ProductFilters';
 import { ProductTable } from '@/components/product/ProductTable';
 import { Button } from '@/components/shared/Button';
@@ -14,6 +17,12 @@ import { useProductListPage } from '@/usecase/products/use-product-list-page';
 export function ProductListPage() {
   const vm = useProductListPage();
   const navigate = useNavigate();
+  const [importOpen, setImportOpen] = useState(false);
+
+  const closeImport = () => {
+    setImportOpen(false);
+    vm.importer.reset();
+  };
 
   return (
     <div className="space-y-6">
@@ -21,7 +30,16 @@ export function ProductListPage() {
         title="製品マスタ"
         description="製品マスタデータの検索・登録・ガバナンス管理"
         actions={
-          <Button onClick={() => navigate('/products/new')}>新規登録</Button>
+          <div className="flex flex-wrap gap-2">
+            <ExportButton
+              count={vm.view.filteredCount}
+              onExport={vm.exportCsv}
+            />
+            <Button variant="secondary" onClick={() => setImportOpen(true)}>
+              インポート
+            </Button>
+            <Button onClick={() => navigate('/products/new')}>新規登録</Button>
+          </div>
         }
       />
 
@@ -69,6 +87,23 @@ export function ProductListPage() {
           onEdit={(id) => navigate(`/products/${id}/edit`)}
         />
       )}
+
+      <ImportWizard
+        open={importOpen}
+        entityLabel="製品"
+        mode={vm.importer.mode}
+        fileName={vm.importer.fileName}
+        parsing={vm.importer.parsing}
+        parseError={vm.importer.parseError}
+        preview={vm.importer.preview}
+        committing={vm.importer.committing}
+        outcome={vm.importer.outcome}
+        onModeChange={vm.importer.setMode}
+        onSelectFile={vm.importer.loadFile}
+        onCommit={vm.importer.commit}
+        onClose={closeImport}
+        onDownloadTemplate={vm.downloadTemplate}
+      />
     </div>
   );
 }

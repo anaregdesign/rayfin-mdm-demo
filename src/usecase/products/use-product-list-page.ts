@@ -1,6 +1,15 @@
 import { useCallback, useMemo, useState } from 'react';
 
+import type { ProductInput } from '@/domain/models/product';
 import type { ProductStatus } from '@/domain/models/master-status';
+import {
+  PRODUCT_CSV_HEADERS,
+  productImportTemplate,
+  productToCsvRow,
+  evaluateProductImport,
+} from '@/domain/policies/import-policy';
+import { useCsvExport } from '@/usecase/export/use-export';
+import { useImport, type ImportController } from '@/usecase/import/use-import';
 import { toMessage } from '@/lib/errors';
 
 import { useProducts } from './use-products';
@@ -26,6 +35,9 @@ export interface ProductListPageViewModel {
   changeStatus: (id: string, status: ProductStatus) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
   reload: () => Promise<void>;
+  importer: ImportController<ProductInput>;
+  exportCsv: () => void;
+  downloadTemplate: () => void;
 }
 
 /** Orchestrates the product list screen: filters, derived view, row actions. */
@@ -41,6 +53,30 @@ export function useProductListPage(): ProductListPageViewModel {
     () => buildProductListView(store.products, filters),
     [store.products, filters]
   );
+
+  const exporter = useCsvExport();
+
+  const buildPreview = useCallback(
+    (records: Record<string, string>[], mode: Parameters<typeof evaluateProductImport>[2]) =>
+      evaluateProductImport(records, store.products, mode),
+    [store.products]
+  );
+
+  const importer = useImport<ProductInput>({
+    buildPreview,
+    create: store.createProduct,
+    update: store.updateProduct,
+    reload: store.reload,
+  });
+
+  const exportCsv = useCallback(() => {
+    const rows = view.items.map((item) => productToCsvRow(item.product));
+    exporter.exportMatrix('products.csv', [PRODUCT_CSV_HEADERS, ...rows]);
+  }, [exporter, view.items]);
+
+  const downloadTemplate = useCallback(() => {
+    exporter.exportMatrix('products-template.csv', productImportTemplate());
+  }, [exporter]);
 
   const setSearch = useCallback(
     (search: string) => setFilters((f) => ({ ...f, search })),
@@ -98,5 +134,8 @@ export function useProductListPage(): ProductListPageViewModel {
     changeStatus,
     deleteProduct,
     reload: store.reload,
+    importer,
+    exportCsv,
+    downloadTemplate,
   };
 }
