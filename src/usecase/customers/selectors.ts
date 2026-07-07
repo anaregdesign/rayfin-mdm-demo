@@ -12,6 +12,8 @@ import { includesNormalized } from '@/lib/text';
 
 export type CustomerSortKey = 'updated' | 'name' | 'code' | 'quality';
 export type CustomerStatusFilter = CustomerStatus | 'all';
+/** Quality quick filter (Issue #13 drill-down target). */
+export type CustomerQualityFilter = 'all' | 'low';
 
 export interface CustomerListFilters {
   search: string;
@@ -22,6 +24,11 @@ export interface CustomerListFilters {
    * everything beneath it in the org tree (Issue #7). Empty = no restriction.
    */
   ancestorId: string;
+  /**
+   * Quality quick filter (Issue #13): `'low'` restricts the list to
+   * low-quality (band = low) records — the target of a dashboard drill-down.
+   */
+  quality: CustomerQualityFilter;
 }
 
 export const DEFAULT_CUSTOMER_FILTERS: CustomerListFilters = {
@@ -29,6 +36,7 @@ export const DEFAULT_CUSTOMER_FILTERS: CustomerListFilters = {
   status: 'all',
   sort: 'updated',
   ancestorId: '',
+  quality: 'all',
 };
 
 /** Row view-model: the record plus its derived quality and duplicate flag. */
@@ -105,6 +113,7 @@ export function buildCustomerListView(
       quality: evaluateCustomerQuality(customer),
       isDuplicate: dupIds.has(customer.id),
     }))
+    .filter((item) => filters.quality === 'all' || item.quality.band === 'low')
     .sort((a, b) => compareBySort(a, b, filters.sort));
 
   return {

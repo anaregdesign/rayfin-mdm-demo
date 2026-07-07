@@ -15,13 +15,16 @@ import { useAuth } from '@/usecase/auth/use-auth';
 import { toMessage } from '@/lib/errors';
 
 import { useProducts } from './use-products';
+import type {
+  ProductListFilters,
+  ProductListView,
+  ProductSortKey,
+  ProductStatusFilter,
+  ProductQualityFilter,
+} from './selectors';
 import {
   buildProductListView,
   DEFAULT_PRODUCT_FILTERS,
-  type ProductListFilters,
-  type ProductListView,
-  type ProductSortKey,
-  type ProductStatusFilter,
 } from './selectors';
 
 export interface ProductListPageViewModel {
@@ -34,6 +37,8 @@ export interface ProductListPageViewModel {
   setSearch: (search: string) => void;
   setStatusFilter: (status: ProductStatusFilter) => void;
   setSort: (sort: ProductSortKey) => void;
+  /** Toggle the low-quality quick filter (Issue #13 drill-down). */
+  setQuality: (quality: ProductQualityFilter) => void;
   changeStatus: (id: string, status: ProductStatus) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
   reload: () => Promise<void>;
@@ -47,12 +52,15 @@ export interface ProductListPageViewModel {
 }
 
 /** Orchestrates the product list screen: filters, derived view, row actions. */
-export function useProductListPage(): ProductListPageViewModel {
+export function useProductListPage(
+  seed?: Partial<ProductListFilters>
+): ProductListPageViewModel {
   const store = useProducts();
   const { actor } = useAuth();
-  const [filters, setFilters] = useState<ProductListFilters>(
-    DEFAULT_PRODUCT_FILTERS
-  );
+  const [filters, setFilters] = useState<ProductListFilters>(() => ({
+    ...DEFAULT_PRODUCT_FILTERS,
+    ...seed,
+  }));
   const [actionError, setActionError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -97,6 +105,10 @@ export function useProductListPage(): ProductListPageViewModel {
     (sort: ProductSortKey) => setFilters((f) => ({ ...f, sort })),
     []
   );
+  const setQuality = useCallback(
+    (quality: ProductQualityFilter) => setFilters((f) => ({ ...f, quality })),
+    []
+  );
 
   const changeStatus = useCallback(
     async (id: string, status: ProductStatus) => {
@@ -138,6 +150,7 @@ export function useProductListPage(): ProductListPageViewModel {
     setSearch,
     setStatusFilter,
     setSort,
+    setQuality,
     changeStatus,
     deleteProduct,
     reload: store.reload,

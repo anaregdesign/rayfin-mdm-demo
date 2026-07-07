@@ -1,22 +1,37 @@
-import { useNavigate } from 'react-router-dom';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
+import { BreakdownTable } from '@/components/analytics/BreakdownTable';
+import { QualityTrendChart } from '@/components/analytics/QualityTrendChart';
+import { ReportExportButton } from '@/components/analytics/ReportExportButton';
 import { DuplicatePanel } from '@/components/shared/DuplicatePanel';
 import { ErrorState } from '@/components/shared/ErrorState';
 import { LoadingState } from '@/components/shared/LoadingState';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { SelectField } from '@/components/shared/SelectField';
 import { StatCard } from '@/components/shared/StatCard';
 import { QualityOverview } from '@/components/dashboard/QualityOverview';
 import { RecentActivity } from '@/components/dashboard/RecentActivity';
 import { StatusBreakdown } from '@/components/dashboard/StatusBreakdown';
 import { SummaryCards } from '@/components/dashboard/SummaryCards';
 import { StewardWorkloadTable } from '@/components/workqueue/StewardWorkloadTable';
+import {
+  TREND_WINDOW_VALUES,
+  trendWindowLabel,
+  type TrendWindowDays,
+} from '@/domain/models/analytics';
+import { useReportExport } from '@/usecase/analytics/use-report-export';
 import { useDashboard } from '@/usecase/dashboard/use-dashboard';
+
+const TREND_WINDOW_OPTIONS = TREND_WINDOW_VALUES.map((days) => ({
+  value: String(days),
+  label: trendWindowLabel(days),
+}));
 
 /** Analytics overview across both masters (counts, quality, duplicates). */
 export function DashboardPage() {
   const vm = useDashboard();
   const navigate = useNavigate();
+  const report = useReportExport(vm.reportSections);
 
   if (vm.loading) return <LoadingState />;
 
@@ -31,6 +46,34 @@ export function DashboardPage() {
 
       <SummaryCards title="顧客マスタ" summary={vm.customerSummary} />
       <SummaryCards title="製品マスタ" summary={vm.productSummary} />
+
+      <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">品質トレンド</h2>
+            <p className="text-sm text-slate-500">
+              両マスタの平均品質・有効率の推移（累積コホート）
+            </p>
+          </div>
+          <div className="flex items-end gap-2">
+            <div className="w-36">
+              <SelectField
+                label="期間"
+                value={String(vm.trendWindow)}
+                options={TREND_WINDOW_OPTIONS}
+                onChange={(v) =>
+                  vm.setTrendWindow(Number(v) as TrendWindowDays)
+                }
+              />
+            </div>
+            <ReportExportButton
+              onExportCsv={() => report.exportCsv()}
+              onPrint={report.print}
+            />
+          </div>
+        </div>
+        <QualityTrendChart points={vm.trend} />
+      </section>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <StatusBreakdown
@@ -54,6 +97,60 @@ export function DashboardPage() {
           total={vm.productSummary.total}
         />
       </div>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold text-slate-900">
+          ドリルダウン（低品質レコード）
+        </h2>
+        <p className="text-sm text-slate-500">
+          カードをクリックすると、該当マスタの一覧を低品質のみに絞り込んで開きます。
+        </p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <StatCard
+            label="低品質の顧客"
+            value={vm.customerSummary.quality.low}
+            hint="品質スコアが50未満の顧客レコード"
+            accent={vm.customerSummary.quality.low > 0 ? 'danger' : 'positive'}
+            onClick={() =>
+              navigate('/customers', {
+                state: { drilldown: { entity: 'customer', quality: 'low' } },
+              })
+            }
+          />
+          <StatCard
+            label="低品質の製品"
+            value={vm.productSummary.quality.low}
+            hint="品質スコアが50未満の製品レコード"
+            accent={vm.productSummary.quality.low > 0 ? 'danger' : 'positive'}
+            onClick={() =>
+              navigate('/products', {
+                state: { drilldown: { entity: 'product', quality: 'low' } },
+              })
+            }
+          />
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold text-slate-900">構成分析</h2>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <BreakdownTable
+            title="マスタ種別"
+            keyLabel="マスタ"
+            groups={vm.entityBreakdown}
+          />
+          <BreakdownTable
+            title="スチュワード別"
+            keyLabel="担当"
+            groups={vm.stewardBreakdown}
+          />
+          <BreakdownTable
+            title="製品カテゴリ別"
+            keyLabel="カテゴリ"
+            groups={vm.categoryBreakdown}
+          />
+        </div>
+      </section>
 
       <StewardWorkloadTable
         title="スチュワード別 未対応件数"
