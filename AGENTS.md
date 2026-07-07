@@ -312,6 +312,57 @@ and a header **role switcher** lets you demo each role live.
   steward-scoped RLS predicate, and gate the CD smoke-test user with a role that
   can read. The client policy above stays as defence-in-depth.
 
+### Change approval workflow (Issue #8)
+
+Optional **maker-checker approval** for master edits, layered on top of the #9
+role model. A header **demo toggle** (`承認フロー（デモ）`) routes customer/product
+create+update through an approval queue instead of writing directly; an admin
+reviews and, on approval, the payload is applied to the target master.
+
+- **Why a demo toggle (default OFF)?** The live single-user Fabric demo and the
+  CD smoke test must keep working with direct writes. `requireApproval` is an
+  **app-layer flag owned by `AuthContext`** (like `activeRole`), exposed via
+  `use-auth.ts` (`requireApproval`/`setRequireApproval`) and flipped from the
+  `components/approval/ApprovalModeToggle.tsx` header switch (render-only, wired
+  through `AppShell.headerExtra`). Off by default ⇒ existing flows unchanged.
+- **The request is a first-class entity.** `rayfin/data/ChangeRequest.ts`
+  (`@authenticated('*')`, registered in `schema.ts`) stores entityType/entityId/
+  operation/`payload` (proposed `CustomerInput`/`ProductInput` as JSON, max 8000)/
+  status/requestedBy/reviewedBy/reason/summary/requestedAt/reviewedAt. Domain model
+  `src/domain/models/change-request.ts` adds JP label/tone helpers; the mapper
+  `src/infrastructure/data/change-request-mapper.ts` guards payload JSON round-trip
+  (6 mapper tests).
+- **Rules are one pure policy.** `src/domain/policies/approval-policy.ts` —
+  `canApprove` (**admin only** — do NOT reuse `canModifyAny`, which is true for
+  stewards too), `isSelfReview`, `canReview`/`reviewBlockReason`
+  (pending + approver + optional segregation-of-duties), and the non-mutating
+  `applyDecision(request, decision, reviewer, reason, at)`. Segregation of duties
+  (maker ≠ checker) is **optional** (`enforceSegregation`, default off) so one
+  admin can demo submit→approve, then toggle it on to show the self-approval guard.
+  16 unit tests.
+- **Makers raise; the form contract carries the outcome.** Both form VMs return a
+  `SubmitOutcome<T>` discriminated union (`src/usecase/shared/submit-outcome.ts`):
+  when `requireApproval` is on, `submit()` calls `changeRequests.raise(...)` and
+  returns `{status:'requested'}` (→ the form page navigates to `/approvals` with a
+  notice banner) instead of `{status:'saved'}` (→ navigate to the detail). The
+  `ChangeRequestRepository` port + `RayfinChangeRequestRepository` live behind DI
+  (`changeRequests` in `AppDependencies`).
+- **Approve = apply-then-persist, reusing the master stores.** The page VM
+  `src/usecase/approval/use-approval-page.ts` composes `useCustomers()`+
+  `useProducts()` to build an injected `apply(request)` gateway (customer/product ×
+  create/update) and a `diffRecords` preview (current record → payload), then hands
+  the reviewed decision to the store-agnostic controller
+  `src/usecase/approval/use-change-requests.ts`. On approve the controller **applies
+  the payload first, then** persists `applyDecision(...)` — a failed write never
+  leaves a request marked approved (worst case: still pending, master untouched).
+  The change-logging decorator repos audit the resulting master write automatically.
+- **Render-only review UI.** `components/approval/RequestReviewCard.tsx` (operation/
+  status badges, requester, `FieldDiffRow` diff preview, 承認/却下 + reason, gated by
+  `canReview`/`blockReason` props) inside `ApprovalQueue.tsx`; thin
+  `pages/ApprovalPage.tsx` reads the VM, shows the approver a pending queue + a
+  segregation checkbox and everyone a read-only history, and surfaces the post-submit
+  notice from `useLocation().state`. Route `/approvals` + `AppShell` nav entry「承認」.
+
 ### Deployment (Fabric)
 
 The PoC is deployed to Microsoft Fabric. Deploy with `npx rayfin up -y` from the
@@ -431,16 +482,17 @@ npm run seed        # → scripts/seed.mjs
 ### Roadmap & coverage (planned enhancements)
 
 The PoC is measured against the **12-domain general MDM functional requirements**
-laid out at project kickoff. Current breadth is **~45–50%** (core/MVP scope
+laid out at project kickoff. Current breadth is **~72–75%** (core/MVP scope
 ~90%). Coverage by domain:
 
-- ✅ **Implemented (8):** データモデリング / データ品質 / 検索・参照 / 分析・レポート /
+- ✅ **Implemented (9):** データモデリング / データ品質 / 検索・参照 / 分析・レポート /
   バージョン管理（変更履歴・フィールド差分・ロールバック, #5） /
   名寄せ（重複検出＋マージ実行・survivorship・ゴールデンレコード・統合解除, #4） /
   オンボーディング（手動フォーム＋CSV一括インポート/エクスポート・行検証プレビュー, #6） /
-  セキュリティ（ロールベース認可・スチュワード行レベル制御・機密項目マスキング, クライアント側, #9）.
+  セキュリティ（ロールベース認可・スチュワード行レベル制御・機密項目マスキング, クライアント側, #9） /
+  ワークフロー・承認（maker-checker・承認キュー・職務分掌トグル・差分プレビュー, #8）.
 - 🔶 **Partial (1):** ガバナンス (steward + lifecycle).
-- ❌ **Not implemented (3):** 階層・関係管理 / ワークフロー・承認 / 配信・連携.
+- ❌ **Not implemented (2):** 階層・関係管理 / 配信・連携.
 
 **Tracking:** the coverage matrix and roadmap live in **Epic #3**
 (`[Epic] MDM機能カバレッジと不足機能の実装ロードマップ`) — the single source of
@@ -453,7 +505,7 @@ clean-architecture layer map above):
 | P1 | #5  | 変更履歴・バージョン管理（フィールド差分・タイムライン） ✅ **done** | `versioning` |
 | P1 | #6  | 一括インポート/エクスポート（CSV） ✅ **done** | `onboarding` |
 | P2 | #7  | 階層・関係管理（企業グループ／製品カテゴリ／顧客拠点） | `hierarchy` |
-| P2 | #8  | 変更承認ワークフロー（maker-checker） | `workflow` |
+| P2 | #8  | 変更承認ワークフロー（maker-checker） ✅ **done** | `workflow` |
 | P2 | #9  | ロールベース認可・行レベルセキュリティ（@role/RLS） ✅ **done** (client-side) | `security` |
 | P2 | #10 | スチュワードシップ・ワークキュー | `governance` |
 | P3 | #11 | データ品質ルール拡張（標準化・クレンジング・是正キュー） | `quality` |

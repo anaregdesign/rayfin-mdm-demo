@@ -5,6 +5,7 @@ import { MockAuthService } from '@/infrastructure/auth/mock-auth-service';
 import { ChangeLoggingCustomerRepository } from '@/infrastructure/data/change-logging-customer-repository';
 import { ChangeLoggingProductRepository } from '@/infrastructure/data/change-logging-product-repository';
 import { RayfinChangeLogRepository } from '@/infrastructure/data/rayfin-change-log-repository';
+import { RayfinChangeRequestRepository } from '@/infrastructure/data/rayfin-change-request-repository';
 import { RayfinCustomerRepository } from '@/infrastructure/data/rayfin-customer-repository';
 import { RayfinMergeRecordRepository } from '@/infrastructure/data/rayfin-merge-record-repository';
 import { RayfinProductRepository } from '@/infrastructure/data/rayfin-product-repository';
@@ -45,6 +46,7 @@ export function createAppDependencies(
 
   const changeLog = new RayfinChangeLogRepository(facade, clock);
   const merges = new RayfinMergeRecordRepository(facade, clock);
+  const changeRequests = new RayfinChangeRequestRepository(facade, clock);
 
   // Wrap the base repositories so every mutation records change history,
   // transparently to the use-case layer (both share the domain port).
@@ -65,6 +67,7 @@ export function createAppDependencies(
     products,
     changeLog,
     merges,
+    changeRequests,
     clock,
     fabricAuthEnabled: auth.fabricAuthEnabled,
   };

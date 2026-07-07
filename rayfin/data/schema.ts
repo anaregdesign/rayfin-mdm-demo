@@ -1,4 +1,5 @@
 import { ChangeLog } from './ChangeLog.js';
+import { ChangeRequest } from './ChangeRequest.js';
 import { Customer } from './Customer.js';
 import { MergeRecord } from './MergeRecord.js';
 import { Product } from './Product.js';
@@ -13,6 +14,7 @@ export type MdmSchema = {
   Product: Product;
   ChangeLog: ChangeLog;
   MergeRecord: MergeRecord;
+  ChangeRequest: ChangeRequest;
 };
 
-export const schema = [Customer, Product, ChangeLog, MergeRecord];
+export const schema = [Customer, Product, ChangeLog, MergeRecord, ChangeRequest];

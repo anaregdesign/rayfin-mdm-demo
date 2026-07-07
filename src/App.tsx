@@ -7,10 +7,12 @@ import {
 } from 'react-router-dom';
 
 import { AppShell } from '@/components/layout/AppShell';
+import { ApprovalModeToggle } from '@/components/approval/ApprovalModeToggle';
 import { RoleSwitcher } from '@/components/auth/RoleSwitcher';
 import { ROLE_VALUES } from '@/domain/models/authz';
 import { LoadingState } from '@/components/shared/LoadingState';
 import { AuthPage } from '@/pages/AuthPage';
+import { ApprovalPage } from '@/pages/ApprovalPage';
 import { CustomerDetailPage } from '@/pages/CustomerDetailPage';
 import { CustomerFormPage } from '@/pages/CustomerFormPage';
 import { CustomerListPage } from '@/pages/CustomerListPage';
@@ -39,8 +41,16 @@ function AuthRoute() {
 
 /** Guards the app: gates on auth, then wraps children in the app shell. */
 function ProtectedLayout() {
-  const { user, isAuthenticated, loading, signOut, activeRole, setActiveRole } =
-    useAuth();
+  const {
+    user,
+    isAuthenticated,
+    loading,
+    signOut,
+    activeRole,
+    setActiveRole,
+    requireApproval,
+    setRequireApproval,
+  } = useAuth();
   if (loading) return <FullScreenLoading />;
   if (!isAuthenticated) return <Navigate to="/auth" replace />;
   return (
@@ -50,11 +60,17 @@ function ProtectedLayout() {
         void signOut();
       }}
       headerExtra={
-        <RoleSwitcher
-          activeRole={activeRole}
-          options={ROLE_VALUES}
-          onChange={setActiveRole}
-        />
+        <>
+          <ApprovalModeToggle
+            enabled={requireApproval}
+            onChange={setRequireApproval}
+          />
+          <RoleSwitcher
+            activeRole={activeRole}
+            options={ROLE_VALUES}
+            onChange={setActiveRole}
+          />
+        </>
       }
     >
       <Outlet />
@@ -78,6 +94,7 @@ export default function App() {
           <Route path="/products/new" element={<ProductFormPage />} />
           <Route path="/products/:id" element={<ProductDetailPage />} />
           <Route path="/products/:id/edit" element={<ProductFormPage />} />
+          <Route path="/approvals" element={<ApprovalPage />} />
           <Route path="/guide" element={<GuidePage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

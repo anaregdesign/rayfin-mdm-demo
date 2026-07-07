@@ -47,8 +47,12 @@ export function CustomerFormPage() {
   }
 
   const handleSubmit = async () => {
-    const saved = await vm.submit();
-    if (saved) navigate(`/customers/${saved.id}`);
+    const result = await vm.submit();
+    if (result.status === 'saved') navigate(`/customers/${result.record.id}`);
+    else if (result.status === 'requested')
+      navigate('/approvals', {
+        state: { notice: '承認申請を作成しました。管理者の承認をお待ちください。' },
+      });
   };
 
   const cancel = () => {
@@ -69,6 +73,7 @@ export function CustomerFormPage() {
         saving={vm.saving}
         submitError={vm.submitError}
         isEdit={vm.isEdit}
+        approvalRequired={vm.approvalRequired}
         onField={vm.setField}
         onSubmit={handleSubmit}
         onCancel={cancel}

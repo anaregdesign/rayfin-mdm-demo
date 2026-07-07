@@ -28,6 +28,8 @@ interface CustomerFormProps {
   saving: boolean;
   submitError: string | null;
   isEdit: boolean;
+  /** When true, submitting raises an approval request instead of saving. */
+  approvalRequired?: boolean;
   onField: <K extends CustomerField>(key: K, value: CustomerInput[K]) => void;
   onSubmit: () => void;
   onCancel: () => void;
@@ -51,6 +53,7 @@ export function CustomerForm({
   saving,
   submitError,
   isEdit,
+  approvalRequired = false,
   onField,
   onSubmit,
   onCancel,
@@ -200,12 +203,24 @@ export function CustomerForm({
 
       {submitError && <ErrorState message={submitError} />}
 
+      {approvalRequired && (
+        <p className="text-right text-xs text-amber-700">
+          承認ワークフローが有効です。保存すると承認申請が作成され、管理者の承認後に反映されます。
+        </p>
+      )}
+
       <div className="flex justify-end gap-2">
         <Button variant="secondary" onClick={onCancel} disabled={saving}>
           キャンセル
         </Button>
         <Button type="submit" disabled={saving}>
-          {saving ? '保存中…' : isEdit ? '更新' : '登録'}
+          {saving
+            ? '保存中…'
+            : approvalRequired
+              ? '承認申請'
+              : isEdit
+                ? '更新'
+                : '登録'}
         </Button>
       </div>
     </form>
