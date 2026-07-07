@@ -4,6 +4,7 @@ import { NavLink } from 'react-router-dom';
 interface AppShellProps {
   userName: string;
   onSignOut: () => void;
+  headerExtra?: ReactNode;
   children: ReactNode;
 }
 
@@ -24,7 +25,7 @@ function navClass({ isActive }: { isActive: boolean }): string {
 }
 
 /** Authenticated app chrome: top navigation, identity, and content area. */
-export function AppShell({ userName, onSignOut, children }: AppShellProps) {
+export function AppShell({ userName, onSignOut, headerExtra, children }: AppShellProps) {
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="border-b border-slate-200 bg-white">
@@ -47,6 +48,7 @@ export function AppShell({ userName, onSignOut, children }: AppShellProps) {
             </nav>
           </div>
           <div className="flex items-center gap-3">
+            {headerExtra}
             {userName && (
               <span className="hidden text-sm text-slate-500 sm:inline">
                 {userName}

@@ -9,9 +9,11 @@ import {
   validateProductInput,
   type ProductField,
 } from '@/domain/policies/product-validation';
+import { can } from '@/domain/policies/access-policy';
 import { toMessage } from '@/lib/errors';
 
 import { useProducts } from './use-products';
+import { useAuth } from '@/usecase/auth/use-auth';
 
 export interface ProductFormViewModel {
   draft: ProductInput;
@@ -23,6 +25,8 @@ export interface ProductFormViewModel {
   submitError: string | null;
   isEdit: boolean;
   notFound: boolean;
+  /** False when the active role may not create (new) or edit this record. */
+  permitted: boolean;
   setField: <K extends ProductField>(key: K, value: ProductInput[K]) => void;
   submit: () => Promise<Product | null>;
 }
@@ -34,6 +38,7 @@ export interface ProductFormViewModel {
  */
 export function useProductForm(editId?: string): ProductFormViewModel {
   const store = useProducts();
+  const { actor } = useAuth();
   const [draft, setDraft] = useState<ProductInput>(emptyProductInput);
   const [touched, setTouched] = useState<Set<ProductField>>(new Set());
   const [submitAttempted, setSubmitAttempted] = useState(false);
@@ -99,6 +104,16 @@ export function useProductForm(editId?: string): ProductFormViewModel {
   const isEdit = editId != null;
   const notFound = isEdit && !store.loading && !existing;
 
+  // Create needs 'create'; edit needs 'edit' on the loaded record (steward RLS).
+  // Undetermined while the edit target is still loading → treat as permitted so
+  // the loader shows instead of a false 403.
+  const permitted = useMemo(() => {
+    if (!actor) return false;
+    if (!isEdit) return can(actor, 'create');
+    if (!existing) return true;
+    return can(actor, 'edit', existing);
+  }, [actor, isEdit, existing]);
+
   return {
     draft,
     errors,
@@ -109,6 +124,7 @@ export function useProductForm(editId?: string): ProductFormViewModel {
     submitError,
     isEdit,
     notFound,
+    permitted,
     setField,
     submit,
   };

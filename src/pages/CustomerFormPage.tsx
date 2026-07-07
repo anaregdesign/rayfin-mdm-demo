@@ -26,6 +26,26 @@ export function CustomerFormPage() {
     );
   }
 
+  if (!vm.permitted) {
+    return (
+      <div className="space-y-4">
+        <ErrorState
+          message={
+            vm.isEdit
+              ? 'この顧客を編集する権限がありません。担当のデータスチュワード、または管理者に連絡してください。'
+              : '顧客を新規登録する権限がありません。管理者に連絡してください。'
+          }
+        />
+        <Button
+          variant="secondary"
+          onClick={() => navigate(id ? `/customers/${id}` : '/customers')}
+        >
+          {id ? '詳細へ戻る' : '一覧へ戻る'}
+        </Button>
+      </div>
+    );
+  }
+
   const handleSubmit = async () => {
     const saved = await vm.submit();
     if (saved) navigate(`/customers/${saved.id}`);

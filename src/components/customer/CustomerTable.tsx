@@ -10,7 +10,7 @@ import type { CustomerListItem } from '@/usecase/customers/selectors';
 interface CustomerTableProps {
   items: CustomerListItem[];
   onOpen: (id: string) => void;
-  onEdit: (id: string) => void;
+  onEdit?: (id: string) => void;
 }
 
 /** Read-only customer list table. Row actions open detail / edit screens. */
@@ -56,13 +56,17 @@ export function CustomerTable({ items, onOpen, onEdit }: CustomerTableProps) {
                 {formatDate(customer.updatedAt)}
               </td>
               <td className="px-4 py-3 text-right">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onEdit(customer.id)}
-                >
-                  編集
-                </Button>
+                {onEdit ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onEdit(customer.id)}
+                  >
+                    編集
+                  </Button>
+                ) : (
+                  <span className="text-xs text-slate-400">—</span>
+                )}
               </td>
             </tr>
           ))}

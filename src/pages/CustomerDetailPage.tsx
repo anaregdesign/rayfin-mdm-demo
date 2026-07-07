@@ -80,12 +80,16 @@ export function CustomerDetailPage() {
       {vm.actionError && <ErrorState message={vm.actionError} />}
 
       <CustomerStatusActions
-        allowedTransitions={vm.allowedTransitions}
+        allowedTransitions={vm.canChangeStatus ? vm.allowedTransitions : []}
         busy={vm.busy}
         onChange={vm.changeStatus}
       />
 
-      <CustomerDetailCard customer={vm.customer} quality={vm.quality} />
+      <CustomerDetailCard
+        customer={vm.customer}
+        quality={vm.quality}
+        canViewSensitive={vm.canViewSensitive}
+      />
 
       <DuplicatePanel
         title="この顧客の重複候補"
@@ -104,7 +108,7 @@ export function CustomerDetailPage() {
           )
         }
         renderAction={
-          vm.canEdit
+          vm.canMerge
             ? (otherId) => (
                 <Button
                   variant="secondary"
@@ -124,7 +128,7 @@ export function CustomerDetailPage() {
         loading={vm.historyLoading}
         error={vm.historyError}
         busy={vm.busy}
-        onRestore={vm.restore}
+        onRestore={vm.canEdit ? vm.restore : undefined}
       />
 
       <MergeHistoryPanel
@@ -132,7 +136,7 @@ export function CustomerDetailPage() {
         loading={vm.mergeHistoryLoading}
         error={vm.mergeHistoryError}
         busy={vm.busy}
-        onUndo={vm.unmerge}
+        onUndo={vm.canMerge ? vm.unmerge : undefined}
       />
 
       <MergeDialog

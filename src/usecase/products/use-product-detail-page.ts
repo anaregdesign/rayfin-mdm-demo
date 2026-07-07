@@ -17,7 +17,12 @@ import {
   canDeleteProduct,
   canEditProduct,
 } from '@/domain/policies/product-status-policy';
+import {
+  can,
+  canViewSensitive as policyCanViewSensitive,
+} from '@/domain/policies/access-policy';
 import { useDependencies } from '@/di/dependencies';
+import { useAuth } from '@/usecase/auth/use-auth';
 import { toMessage } from '@/lib/errors';
 import { useChangeHistory } from '@/usecase/history/use-change-history';
 import {
@@ -40,6 +45,9 @@ export interface ProductDetailViewModel {
   allowedTransitions: ProductStatus[];
   canEdit: boolean;
   canDelete: boolean;
+  canChangeStatus: boolean;
+  canMerge: boolean;
+  canViewSensitive: boolean;
   history: ChangeEntry[];
   historyLoading: boolean;
   historyError: string | null;
@@ -61,6 +69,7 @@ export interface ProductDetailViewModel {
 export function useProductDetailPage(id: string): ProductDetailViewModel {
   const store = useProducts();
   const deps = useDependencies();
+  const { actor } = useAuth();
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -82,8 +91,23 @@ export function useProductDetailPage(id: string): ProductDetailViewModel {
   const allowedTransitions = product
     ? allowedProductTransitions(product.status)
     : [];
-  const canEdit = product ? canEditProduct(product) : false;
-  const canDelete = product ? canDeleteProduct(product) : false;
+  const canEdit =
+    !!product &&
+    canEditProduct(product) &&
+    !!actor &&
+    can(actor, 'edit', product);
+  const canDelete =
+    !!product &&
+    canDeleteProduct(product) &&
+    !!actor &&
+    can(actor, 'delete', product);
+  const canChangeStatus =
+    !!product &&
+    allowedTransitions.length > 0 &&
+    !!actor &&
+    can(actor, 'changeStatus', product);
+  const canMerge = !!product && !!actor && can(actor, 'merge', product);
+  const canViewSensitive = !!actor && policyCanViewSensitive(actor);
 
   const changeStatus = useCallback(
     async (status: ProductStatus) => {
@@ -226,6 +250,9 @@ export function useProductDetailPage(id: string): ProductDetailViewModel {
     allowedTransitions,
     canEdit,
     canDelete,
+    canChangeStatus,
+    canMerge,
+    canViewSensitive,
     history: history.entries,
     historyLoading: history.loading,
     historyError: history.error,

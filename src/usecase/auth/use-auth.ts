@@ -1,6 +1,7 @@
 import { createContext, useContext } from 'react';
 
 import type { AuthUser } from '@/domain/models/auth-user';
+import type { Actor, Role } from '@/domain/models/authz';
 
 export interface AuthContextValue {
   user: AuthUser | null;
@@ -10,6 +11,19 @@ export interface AuthContextValue {
   signOut: () => Promise<void>;
   isAuthenticated: boolean;
   fabricAuthEnabled: boolean;
+  /** Roles granted to the signed-in identity (from the auth adapter). */
+  grantedRoles: Role[];
+  /**
+   * The effective role for access decisions. Initialized to the highest
+   * granted role and switchable at runtime for the demo (see RoleSwitcher).
+   */
+  activeRole: Role;
+  setActiveRole: (role: Role) => void;
+  /**
+   * Convenience actor (identity + active role) consumed by view-models when
+   * calling the access policy. Null when unauthenticated.
+   */
+  actor: Actor | null;
 }
 
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined);

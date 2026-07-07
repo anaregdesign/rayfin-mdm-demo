@@ -7,7 +7,7 @@ import type { AuthService } from '@/domain/ports/auth-service';
 const stubAuthService: AuthService = {
   fabricAuthEnabled: false,
   async signIn() {
-    return { id: 'u1', email: 'dev@contoso.com', name: 'dev' };
+    return { id: 'u1', email: 'dev@contoso.com', name: 'dev', roles: ['admin'] };
   },
   async signOut() {},
   async getCurrentUser() {
