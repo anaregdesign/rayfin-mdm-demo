@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { to: '/categories', label: 'カテゴリ管理', end: false },
   { to: '/workqueue', label: 'ワークキュー', end: false },
   { to: '/remediation', label: '是正キュー', end: false },
+  { to: '/distribution', label: '配信・連携', end: false },
   { to: '/approvals', label: '承認', end: false },
   { to: '/guide', label: 'MDMガイド', end: false },
 ];

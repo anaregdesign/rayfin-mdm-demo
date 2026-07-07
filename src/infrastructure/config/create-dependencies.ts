@@ -4,12 +4,16 @@ import { FabricAuthService } from '@/infrastructure/auth/fabric-auth-service';
 import { MockAuthService } from '@/infrastructure/auth/mock-auth-service';
 import { ChangeLoggingCustomerRepository } from '@/infrastructure/data/change-logging-customer-repository';
 import { ChangeLoggingProductRepository } from '@/infrastructure/data/change-logging-product-repository';
+import { DistributionCustomerRepository } from '@/infrastructure/data/distribution-customer-repository';
+import { DistributionProductRepository } from '@/infrastructure/data/distribution-product-repository';
 import { RayfinCategoryRepository } from '@/infrastructure/data/rayfin-category-repository';
 import { RayfinChangeLogRepository } from '@/infrastructure/data/rayfin-change-log-repository';
 import { RayfinChangeRequestRepository } from '@/infrastructure/data/rayfin-change-request-repository';
 import { RayfinCustomerRepository } from '@/infrastructure/data/rayfin-customer-repository';
 import { RayfinMergeRecordRepository } from '@/infrastructure/data/rayfin-merge-record-repository';
+import { RayfinOutboxEventRepository } from '@/infrastructure/data/rayfin-outbox-event-repository';
 import { RayfinProductRepository } from '@/infrastructure/data/rayfin-product-repository';
+import { LoggingHttpClient } from '@/infrastructure/http/logging-http-client';
 import { createRayfinClient } from '@/infrastructure/rayfin/client';
 
 import { readAppConfig, type AppConfig } from './env';
@@ -49,17 +53,31 @@ export function createAppDependencies(
   const merges = new RayfinMergeRecordRepository(facade, clock);
   const changeRequests = new RayfinChangeRequestRepository(facade, clock);
   const categories = new RayfinCategoryRepository(facade, clock);
+  const outbox = new RayfinOutboxEventRepository(facade, clock);
+  // Log-only in the PoC (no network egress from the Fabric demo). Swap for
+  // `FetchHttpClient` to enable real webhook delivery in production.
+  const httpClient = new LoggingHttpClient();
 
-  // Wrap the base repositories so every mutation records change history,
-  // transparently to the use-case layer (both share the domain port).
-  const customers = new ChangeLoggingCustomerRepository(
-    new RayfinCustomerRepository(facade, clock),
-    changeLog,
+  // Wrap the base repositories so every mutation records change history AND
+  // emits a distribution (outbox) event, transparently to the use-case layer
+  // (all three share the domain port). Distribution wraps OUTSIDE the audit
+  // decorator so one write yields both an audit entry and an outbox event.
+  const customers = new DistributionCustomerRepository(
+    new ChangeLoggingCustomerRepository(
+      new RayfinCustomerRepository(facade, clock),
+      changeLog,
+      actor
+    ),
+    outbox,
     actor
   );
-  const products = new ChangeLoggingProductRepository(
-    new RayfinProductRepository(facade, clock),
-    changeLog,
+  const products = new DistributionProductRepository(
+    new ChangeLoggingProductRepository(
+      new RayfinProductRepository(facade, clock),
+      changeLog,
+      actor
+    ),
+    outbox,
     actor
   );
 
@@ -71,6 +89,8 @@ export function createAppDependencies(
     changeLog,
     merges,
     changeRequests,
+    outbox,
+    httpClient,
     clock,
     fabricAuthEnabled: auth.fabricAuthEnabled,
   };

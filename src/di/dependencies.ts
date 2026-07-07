@@ -2,11 +2,13 @@ import { createContext, useContext } from 'react';
 
 import type { AuthService } from '@/domain/ports/auth-service';
 import type { Clock } from '@/domain/ports/clock';
+import type { HttpClient } from '@/domain/ports/http-client';
 import type { ChangeLogRepository } from '@/domain/repositories/change-log-repository';
 import type { ChangeRequestRepository } from '@/domain/repositories/change-request-repository';
 import type { CategoryRepository } from '@/domain/repositories/category-repository';
 import type { CustomerRepository } from '@/domain/repositories/customer-repository';
 import type { MergeRecordRepository } from '@/domain/repositories/merge-record-repository';
+import type { OutboxEventRepository } from '@/domain/repositories/outbox-event-repository';
 import type { ProductRepository } from '@/domain/repositories/product-repository';
 
 /**
@@ -21,6 +23,8 @@ export interface AppDependencies {
   changeLog: ChangeLogRepository;
   merges: MergeRecordRepository;
   changeRequests: ChangeRequestRepository;
+  outbox: OutboxEventRepository;
+  httpClient: HttpClient;
   clock: Clock;
   /** True when the auth service requires Fabric interactive sign-in. */
   fabricAuthEnabled: boolean;
