@@ -10,6 +10,8 @@ import {
 } from '@/domain/policies/import-policy';
 import { useCsvExport } from '@/usecase/export/use-export';
 import { useImport, type ImportController } from '@/usecase/import/use-import';
+import { can, canModifyAny } from '@/domain/policies/access-policy';
+import { useAuth } from '@/usecase/auth/use-auth';
 import { toMessage } from '@/lib/errors';
 
 import { useCustomers } from './use-customers';
@@ -38,11 +40,20 @@ export interface CustomerListPageViewModel {
   importer: ImportController<CustomerInput>;
   exportCsv: () => void;
   downloadTemplate: () => void;
+  /** Role may create a new record. */
+  canCreate: boolean;
+  /** Role may bulk-import records. */
+  canImport: boolean;
+  /** Role may export (all authenticated roles). */
+  canExport: boolean;
+  /** Role may modify records (controls the row edit affordance). */
+  canModify: boolean;
 }
 
 /** Orchestrates the customer list screen: filters, derived view, row actions. */
 export function useCustomerListPage(): CustomerListPageViewModel {
   const store = useCustomers();
+  const { actor } = useAuth();
   const [filters, setFilters] = useState<CustomerListFilters>(
     DEFAULT_CUSTOMER_FILTERS
   );
@@ -137,5 +148,9 @@ export function useCustomerListPage(): CustomerListPageViewModel {
     importer,
     exportCsv,
     downloadTemplate,
+    canCreate: !!actor && can(actor, 'create'),
+    canImport: !!actor && can(actor, 'import'),
+    canExport: !!actor && can(actor, 'export'),
+    canModify: !!actor && canModifyAny(actor),
   };
 }

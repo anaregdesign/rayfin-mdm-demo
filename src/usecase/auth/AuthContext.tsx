@@ -7,6 +7,8 @@ import {
 } from 'react';
 
 import type { AuthUser } from '@/domain/models/auth-user';
+import type { Actor, Role } from '@/domain/models/authz';
+import { highestRole } from '@/domain/models/authz';
 import type { AuthService } from '@/domain/ports/auth-service';
 
 import { AuthContext, type AuthContextValue } from './use-auth';
@@ -25,6 +27,14 @@ export function AuthProvider({ children, authService }: AuthProviderProps) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeRole, setActiveRole] = useState<Role>('viewer');
+
+  // When the signed-in identity changes, reset the effective role to the
+  // highest role it was granted (demo switcher can then step down/up).
+  const applyUser = useCallback((next: AuthUser | null) => {
+    setUser(next);
+    setActiveRole(next ? highestRole(next.roles) : 'viewer');
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -32,10 +42,10 @@ export function AuthProvider({ children, authService }: AuthProviderProps) {
       .initEmbeddedAuth()
       .then((embedded) => embedded ?? authService.getCurrentUser())
       .then((current) => {
-        if (!cancelled && current) setUser(current);
+        if (!cancelled && current) applyUser(current);
       })
       .catch(() => {
-        if (!cancelled) setUser(null);
+        if (!cancelled) applyUser(null);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -43,14 +53,14 @@ export function AuthProvider({ children, authService }: AuthProviderProps) {
     return () => {
       cancelled = true;
     };
-  }, [authService]);
+  }, [authService, applyUser]);
 
   const signIn = useCallback(async () => {
     setError(null);
     setLoading(true);
     try {
       const loggedInUser = await authService.signIn();
-      setUser(loggedInUser);
+      applyUser(loggedInUser);
       return loggedInUser;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'サインインに失敗しました';
@@ -59,17 +69,25 @@ export function AuthProvider({ children, authService }: AuthProviderProps) {
     } finally {
       setLoading(false);
     }
-  }, [authService]);
+  }, [authService, applyUser]);
 
   const signOut = useCallback(async () => {
     try {
       await authService.signOut();
-      setUser(null);
+      applyUser(null);
       setError(null);
     } catch (err) {
       console.error('Sign-out error:', err);
     }
-  }, [authService]);
+  }, [authService, applyUser]);
+
+  const actor = useMemo<Actor | null>(
+    () =>
+      user
+        ? { id: user.id, email: user.email, name: user.name, role: activeRole }
+        : null,
+    [user, activeRole]
+  );
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -80,8 +98,12 @@ export function AuthProvider({ children, authService }: AuthProviderProps) {
       signOut,
       isAuthenticated: !!user,
       fabricAuthEnabled: authService.fabricAuthEnabled,
+      grantedRoles: user?.roles ?? [],
+      activeRole,
+      setActiveRole,
+      actor,
     }),
-    [user, loading, error, signIn, signOut, authService]
+    [user, loading, error, signIn, signOut, authService, activeRole, actor]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

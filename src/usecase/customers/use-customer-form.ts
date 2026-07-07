@@ -12,9 +12,11 @@ import {
   validateCustomerInput,
   type CustomerField,
 } from '@/domain/policies/customer-validation';
+import { can } from '@/domain/policies/access-policy';
 import { toMessage } from '@/lib/errors';
 
 import { useCustomers } from './use-customers';
+import { useAuth } from '@/usecase/auth/use-auth';
 
 export interface CustomerFormViewModel {
   draft: CustomerInput;
@@ -26,6 +28,8 @@ export interface CustomerFormViewModel {
   submitError: string | null;
   isEdit: boolean;
   notFound: boolean;
+  /** False when the active role may not create (new) or edit this record. */
+  permitted: boolean;
   setField: <K extends CustomerField>(key: K, value: CustomerInput[K]) => void;
   submit: () => Promise<Customer | null>;
 }
@@ -37,6 +41,7 @@ export interface CustomerFormViewModel {
  */
 export function useCustomerForm(editId?: string): CustomerFormViewModel {
   const store = useCustomers();
+  const { actor } = useAuth();
   const [draft, setDraft] = useState<CustomerInput>(emptyCustomerInput);
   const [touched, setTouched] = useState<Set<CustomerField>>(new Set());
   const [submitAttempted, setSubmitAttempted] = useState(false);
@@ -102,6 +107,16 @@ export function useCustomerForm(editId?: string): CustomerFormViewModel {
   const isEdit = editId != null;
   const notFound = isEdit && !store.loading && !existing;
 
+  // Create needs 'create'; edit needs 'edit' on the loaded record (steward RLS).
+  // Undetermined while the edit target is still loading → treat as permitted so
+  // the loader shows instead of a false 403.
+  const permitted = useMemo(() => {
+    if (!actor) return false;
+    if (!isEdit) return can(actor, 'create');
+    if (!existing) return true;
+    return can(actor, 'edit', existing);
+  }, [actor, isEdit, existing]);
+
   return {
     draft,
     errors,
@@ -112,6 +127,7 @@ export function useCustomerForm(editId?: string): CustomerFormViewModel {
     submitError,
     isEdit,
     notFound,
+    permitted,
     setField,
     submit,
   };

@@ -7,6 +7,8 @@ import {
 } from 'react-router-dom';
 
 import { AppShell } from '@/components/layout/AppShell';
+import { RoleSwitcher } from '@/components/auth/RoleSwitcher';
+import { ROLE_VALUES } from '@/domain/models/authz';
 import { LoadingState } from '@/components/shared/LoadingState';
 import { AuthPage } from '@/pages/AuthPage';
 import { CustomerDetailPage } from '@/pages/CustomerDetailPage';
@@ -37,7 +39,8 @@ function AuthRoute() {
 
 /** Guards the app: gates on auth, then wraps children in the app shell. */
 function ProtectedLayout() {
-  const { user, isAuthenticated, loading, signOut } = useAuth();
+  const { user, isAuthenticated, loading, signOut, activeRole, setActiveRole } =
+    useAuth();
   if (loading) return <FullScreenLoading />;
   if (!isAuthenticated) return <Navigate to="/auth" replace />;
   return (
@@ -46,6 +49,13 @@ function ProtectedLayout() {
       onSignOut={() => {
         void signOut();
       }}
+      headerExtra={
+        <RoleSwitcher
+          activeRole={activeRole}
+          options={ROLE_VALUES}
+          onChange={setActiveRole}
+        />
+      }
     >
       <Outlet />
     </AppShell>

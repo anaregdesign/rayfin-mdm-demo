@@ -260,6 +260,58 @@ render-only.
   `downloadTemplate()`. Components may `type`-import from the use case (an
   established pattern here) but contain no business logic.
 
+### Role-based access control (Issue #9)
+
+Client-side **RBAC + row-level steward RLS + sensitive-field masking**, all
+driven by a single pure domain policy. The demo runs as one Entra SSO user, so
+roles are **app-resolved through the `AuthService` port** (not Entra app-roles)
+and a header **role switcher** lets you demo each role live.
+
+- **Why not Entra `@role` on the entities?** The live Fabric demo authenticates
+  as a single SSO user with **no app-role assignments**. Switching the platform
+  entities to `@role`/policy-DSL access would lock that user out and break the CD
+  smoke test. So the PoC **keeps `@authenticated('*')`** on the entities and
+  enforces authorization in the app; the production `@role`/RLS path is
+  documented here but not wired. This matches the issue's PoC framing (it asks
+  for a demo role switch).
+- **Vocabulary is one source of truth.** `src/domain/models/authz.ts` defines the
+  `Role` union (`viewer`=閲覧者 / `steward`=データスチュワード / `admin`=管理者)
+  with `ROLE_LABELS`/`ROLE_DESCRIPTIONS`/`highestRole`, the `ResourceAction` union
+  (`view/create/edit/delete/merge/changeStatus/import/export`), the `Actor` shape,
+  and the sensitive-field lists (`SENSITIVE_CUSTOMER_FIELDS` = taxId・annualRevenue;
+  products have none) + `MASKED_PLACEHOLDER`.
+- **All authorization is one pure function.** `src/domain/policies/access-policy.ts`
+  — `can(actor, action, resource?)` plus `isRecordSteward`/`canViewSensitive`/
+  `canModifyAny`. Admin ⇒ everything; viewer ⇒ `view`/`export` only (sensitive
+  fields masked); steward ⇒ view/export/create/import always, **and**
+  edit/delete/merge/changeStatus **only on records they own** (steward field
+  matches their email/name/id, case-insensitive) **or unassigned records**
+  (`steward === ''`). No SDK, no React — 11 unit tests
+  (`domain/policies/__tests__/access-policy.test.ts`).
+- **Roles enter through the port; the switch lives in the app.** `toAuthUser(user,
+  roles = ['admin'])` defaults the live SSO user to `admin`, so **no auth adapter
+  changes** are needed. `AuthContext` owns `activeRole` (inits to
+  `highestRole(grantedRoles)`, resets on sign-in/out) and derives the `actor`;
+  `use-auth.ts` exposes `grantedRoles`/`activeRole`/`setActiveRole`/`actor`. The
+  demo `components/auth/RoleSwitcher.tsx` (render-only) offers **all** roles so an
+  admin can preview viewer/steward, wired into `AppShell` via its `headerExtra`
+  slot from `App.tsx`.
+- **Gating is computed in the VM, applied in the page.** Detail/list VMs call
+  `useAuth()` for the `actor` and expose booleans (`canEdit`/`canDelete`/
+  `canChangeStatus`/`canMerge`/`canViewSensitive` on detail; `canCreate`/
+  `canImport`/`canExport`/`canModify` on list) that **combine** the existing
+  status rules with `can(...)`. Pages hide affordances accordingly: list header
+  buttons + row 編集 (tables take an **optional** `onEdit`), detail edit/delete/
+  status/統合/ロールバック controls, and the detail card **masks** taxId・
+  annualRevenue with `MASKED_PLACEHOLDER` when `!canViewSensitive`. The form
+  pages show a **403 message** instead of the form when the active role can't
+  create (new) or edit that specific record (`vm.permitted`).
+- **Production path (documented, not wired):** to enforce server-side, assign
+  Entra app-roles, expose them via the `AuthService` port (replace the
+  `['admin']` default), switch entities to `@role(...)`/policy access with a
+  steward-scoped RLS predicate, and gate the CD smoke-test user with a role that
+  can read. The client policy above stays as defence-in-depth.
+
 ### Deployment (Fabric)
 
 The PoC is deployed to Microsoft Fabric. Deploy with `npx rayfin up -y` from the
@@ -382,12 +434,12 @@ The PoC is measured against the **12-domain general MDM functional requirements*
 laid out at project kickoff. Current breadth is **~45–50%** (core/MVP scope
 ~90%). Coverage by domain:
 
-- ✅ **Implemented (7):** データモデリング / データ品質 / 検索・参照 / 分析・レポート /
+- ✅ **Implemented (8):** データモデリング / データ品質 / 検索・参照 / 分析・レポート /
   バージョン管理（変更履歴・フィールド差分・ロールバック, #5） /
   名寄せ（重複検出＋マージ実行・survivorship・ゴールデンレコード・統合解除, #4） /
-  オンボーディング（手動フォーム＋CSV一括インポート/エクスポート・行検証プレビュー, #6）.
-- 🔶 **Partial (2):** ガバナンス (steward + lifecycle) / セキュリティ (authn only,
-  `@authenticated('*')`).
+  オンボーディング（手動フォーム＋CSV一括インポート/エクスポート・行検証プレビュー, #6） /
+  セキュリティ（ロールベース認可・スチュワード行レベル制御・機密項目マスキング, クライアント側, #9）.
+- 🔶 **Partial (1):** ガバナンス (steward + lifecycle).
 - ❌ **Not implemented (3):** 階層・関係管理 / ワークフロー・承認 / 配信・連携.
 
 **Tracking:** the coverage matrix and roadmap live in **Epic #3**
@@ -402,7 +454,7 @@ clean-architecture layer map above):
 | P1 | #6  | 一括インポート/エクスポート（CSV） ✅ **done** | `onboarding` |
 | P2 | #7  | 階層・関係管理（企業グループ／製品カテゴリ／顧客拠点） | `hierarchy` |
 | P2 | #8  | 変更承認ワークフロー（maker-checker） | `workflow` |
-| P2 | #9  | ロールベース認可・行レベルセキュリティ（@role/RLS） | `security` |
+| P2 | #9  | ロールベース認可・行レベルセキュリティ（@role/RLS） ✅ **done** (client-side) | `security` |
 | P2 | #10 | スチュワードシップ・ワークキュー | `governance` |
 | P3 | #11 | データ品質ルール拡張（標準化・クレンジング・是正キュー） | `quality` |
 | P3 | #12 | 配信・連携（下流公開・Webhook/イベント・API） | `distribution` |

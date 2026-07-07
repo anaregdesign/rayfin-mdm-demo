@@ -17,8 +17,13 @@ import {
   canDeleteCustomer,
   canEditCustomer,
 } from '@/domain/policies/customer-status-policy';
+import {
+  can,
+  canViewSensitive as policyCanViewSensitive,
+} from '@/domain/policies/access-policy';
 import { useDependencies } from '@/di/dependencies';
 import { toMessage } from '@/lib/errors';
+import { useAuth } from '@/usecase/auth/use-auth';
 import { useChangeHistory } from '@/usecase/history/use-change-history';
 import {
   buildMergePlan,
@@ -40,6 +45,12 @@ export interface CustomerDetailViewModel {
   allowedTransitions: CustomerStatus[];
   canEdit: boolean;
   canDelete: boolean;
+  /** Role may change lifecycle status of this record (steward owns it / admin). */
+  canChangeStatus: boolean;
+  /** Role may merge duplicates into this record. */
+  canMerge: boolean;
+  /** Role may see masked sensitive fields (taxId / annualRevenue). */
+  canViewSensitive: boolean;
   history: ChangeEntry[];
   historyLoading: boolean;
   historyError: string | null;
@@ -64,6 +75,7 @@ export interface CustomerDetailViewModel {
 export function useCustomerDetailPage(id: string): CustomerDetailViewModel {
   const store = useCustomers();
   const deps = useDependencies();
+  const { actor } = useAuth();
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -85,8 +97,24 @@ export function useCustomerDetailPage(id: string): CustomerDetailViewModel {
   const allowedTransitions = customer
     ? allowedCustomerTransitions(customer.status)
     : [];
-  const canEdit = customer ? canEditCustomer(customer) : false;
-  const canDelete = customer ? canDeleteCustomer(customer) : false;
+  // Access is the AND of the status-based rule and the role/steward policy.
+  const canEdit =
+    !!customer &&
+    canEditCustomer(customer) &&
+    !!actor &&
+    can(actor, 'edit', customer);
+  const canDelete =
+    !!customer &&
+    canDeleteCustomer(customer) &&
+    !!actor &&
+    can(actor, 'delete', customer);
+  const canChangeStatus =
+    !!customer &&
+    allowedTransitions.length > 0 &&
+    !!actor &&
+    can(actor, 'changeStatus', customer);
+  const canMerge = !!customer && !!actor && can(actor, 'merge', customer);
+  const canViewSensitive = !!actor && policyCanViewSensitive(actor);
 
   const changeStatus = useCallback(
     async (status: CustomerStatus) => {
@@ -229,6 +257,9 @@ export function useCustomerDetailPage(id: string): CustomerDetailViewModel {
     allowedTransitions,
     canEdit,
     canDelete,
+    canChangeStatus,
+    canMerge,
+    canViewSensitive,
     history: history.entries,
     historyLoading: history.loading,
     historyError: history.error,

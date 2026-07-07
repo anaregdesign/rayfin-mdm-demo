@@ -10,6 +10,8 @@ import {
 } from '@/domain/policies/import-policy';
 import { useCsvExport } from '@/usecase/export/use-export';
 import { useImport, type ImportController } from '@/usecase/import/use-import';
+import { can, canModifyAny } from '@/domain/policies/access-policy';
+import { useAuth } from '@/usecase/auth/use-auth';
 import { toMessage } from '@/lib/errors';
 
 import { useProducts } from './use-products';
@@ -38,11 +40,16 @@ export interface ProductListPageViewModel {
   importer: ImportController<ProductInput>;
   exportCsv: () => void;
   downloadTemplate: () => void;
+  canCreate: boolean;
+  canImport: boolean;
+  canExport: boolean;
+  canModify: boolean;
 }
 
 /** Orchestrates the product list screen: filters, derived view, row actions. */
 export function useProductListPage(): ProductListPageViewModel {
   const store = useProducts();
+  const { actor } = useAuth();
   const [filters, setFilters] = useState<ProductListFilters>(
     DEFAULT_PRODUCT_FILTERS
   );
@@ -137,5 +144,9 @@ export function useProductListPage(): ProductListPageViewModel {
     importer,
     exportCsv,
     downloadTemplate,
+    canCreate: !!actor && can(actor, 'create'),
+    canImport: !!actor && can(actor, 'import'),
+    canExport: !!actor && can(actor, 'export'),
+    canModify: !!actor && canModifyAny(actor),
   };
 }

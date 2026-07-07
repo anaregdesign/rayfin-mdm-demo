@@ -80,7 +80,7 @@ export function ProductDetailPage() {
       {vm.actionError && <ErrorState message={vm.actionError} />}
 
       <ProductStatusActions
-        allowedTransitions={vm.allowedTransitions}
+        allowedTransitions={vm.canChangeStatus ? vm.allowedTransitions : []}
         busy={vm.busy}
         onChange={vm.changeStatus}
       />
@@ -104,7 +104,7 @@ export function ProductDetailPage() {
           )
         }
         renderAction={
-          vm.canEdit
+          vm.canMerge
             ? (otherId) => (
                 <Button
                   variant="secondary"
@@ -124,7 +124,7 @@ export function ProductDetailPage() {
         loading={vm.historyLoading}
         error={vm.historyError}
         busy={vm.busy}
-        onRestore={vm.restore}
+        onRestore={vm.canEdit ? vm.restore : undefined}
       />
 
       <MergeHistoryPanel
@@ -132,7 +132,7 @@ export function ProductDetailPage() {
         loading={vm.mergeHistoryLoading}
         error={vm.mergeHistoryError}
         busy={vm.busy}
-        onUndo={vm.unmerge}
+        onUndo={vm.canMerge ? vm.unmerge : undefined}
       />
 
       <MergeDialog

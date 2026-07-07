@@ -31,14 +31,20 @@ export function ProductListPage() {
         description="製品マスタデータの検索・登録・ガバナンス管理"
         actions={
           <div className="flex flex-wrap gap-2">
-            <ExportButton
-              count={vm.view.filteredCount}
-              onExport={vm.exportCsv}
-            />
-            <Button variant="secondary" onClick={() => setImportOpen(true)}>
-              インポート
-            </Button>
-            <Button onClick={() => navigate('/products/new')}>新規登録</Button>
+            {vm.canExport && (
+              <ExportButton
+                count={vm.view.filteredCount}
+                onExport={vm.exportCsv}
+              />
+            )}
+            {vm.canImport && (
+              <Button variant="secondary" onClick={() => setImportOpen(true)}>
+                インポート
+              </Button>
+            )}
+            {vm.canCreate && (
+              <Button onClick={() => navigate('/products/new')}>新規登録</Button>
+            )}
           </div>
         }
       />
@@ -77,14 +83,18 @@ export function ProductListPage() {
           title="製品が見つかりません"
           description="検索条件を変更するか、新しい製品を登録してください。"
           action={
-            <Button onClick={() => navigate('/products/new')}>新規登録</Button>
+            vm.canCreate ? (
+              <Button onClick={() => navigate('/products/new')}>新規登録</Button>
+            ) : undefined
           }
         />
       ) : (
         <ProductTable
           items={vm.view.items}
           onOpen={(id) => navigate(`/products/${id}`)}
-          onEdit={(id) => navigate(`/products/${id}/edit`)}
+          onEdit={
+            vm.canModify ? (id) => navigate(`/products/${id}/edit`) : undefined
+          }
         />
       )}
 

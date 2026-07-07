@@ -9,10 +9,13 @@ import {
 import { CUSTOMER_STATUS_META } from '@/domain/models/master-status';
 import type { QualityResult } from '@/domain/models/quality';
 import { formatDateTime, formatNumber } from '@/lib/format';
+import { MASKED_PLACEHOLDER } from '@/domain/models/authz';
 
 interface CustomerDetailCardProps {
   customer: Customer;
   quality: QualityResult;
+  /** When false, sensitive fields (税務ID・年間売上) are masked. */
+  canViewSensitive?: boolean;
 }
 
 const DASH = '—';
@@ -21,6 +24,7 @@ const DASH = '—';
 export function CustomerDetailCard({
   customer,
   quality,
+  canViewSensitive = true,
 }: CustomerDetailCardProps) {
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -41,11 +45,17 @@ export function CustomerDetailCard({
           <FieldRow label="電話番号">{customer.phone ?? DASH}</FieldRow>
           <FieldRow label="ウェブサイト">{customer.website ?? DASH}</FieldRow>
           <FieldRow label="住所">{customerAddress(customer)}</FieldRow>
-          <FieldRow label="税務ID・法人番号">{customer.taxId ?? DASH}</FieldRow>
+          <FieldRow label="税務ID・法人番号">
+            {!canViewSensitive
+              ? MASKED_PLACEHOLDER
+              : (customer.taxId ?? DASH)}
+          </FieldRow>
           <FieldRow label="年間売上">
-            {customer.annualRevenue != null
-              ? `¥${formatNumber(customer.annualRevenue)}`
-              : DASH}
+            {!canViewSensitive
+              ? MASKED_PLACEHOLDER
+              : customer.annualRevenue != null
+                ? `¥${formatNumber(customer.annualRevenue)}`
+                : DASH}
           </FieldRow>
           <FieldRow label="データスチュワード">
             {customer.steward ?? DASH}
