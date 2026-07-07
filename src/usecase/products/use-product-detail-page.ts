@@ -1,7 +1,8 @@
 import { useCallback, useMemo, useState } from 'react';
 
+import type { ChangeEntry } from '@/domain/models/change-log';
 import type { ProductStatus } from '@/domain/models/master-status';
-import type { Product } from '@/domain/models/product';
+import { productToInput, type Product } from '@/domain/models/product';
 import type { DuplicatePair } from '@/domain/models/duplicate';
 import type { QualityResult } from '@/domain/models/quality';
 import {
@@ -9,12 +10,14 @@ import {
   pairsForId,
 } from '@/domain/policies/duplicate-policy';
 import { evaluateProductQuality } from '@/domain/policies/product-quality-policy';
+import { revertChanges } from '@/domain/policies/diff-policy';
 import {
   allowedProductTransitions,
   canDeleteProduct,
   canEditProduct,
 } from '@/domain/policies/product-status-policy';
 import { toMessage } from '@/lib/errors';
+import { useChangeHistory } from '@/usecase/history/use-change-history';
 
 import { useProducts } from './use-products';
 
@@ -29,8 +32,12 @@ export interface ProductDetailViewModel {
   allowedTransitions: ProductStatus[];
   canEdit: boolean;
   canDelete: boolean;
+  history: ChangeEntry[];
+  historyLoading: boolean;
+  historyError: string | null;
   changeStatus: (status: ProductStatus) => Promise<void>;
   deleteProduct: () => Promise<boolean>;
+  restore: (entry: ChangeEntry) => Promise<void>;
 }
 
 /** Orchestrates the 360° product detail screen and its lifecycle actions. */
@@ -91,6 +98,25 @@ export function useProductDetailPage(id: string): ProductDetailViewModel {
     }
   }, [store, product]);
 
+  const history = useChangeHistory('product', id, product?.updatedAt?.getTime());
+
+  const restore = useCallback(
+    async (entry: ChangeEntry) => {
+      if (!product || entry.changes.length === 0) return;
+      setActionError(null);
+      setBusy(true);
+      try {
+        const reverted = revertChanges(productToInput(product), entry.changes);
+        await store.updateProduct(product.id, reverted);
+      } catch (err) {
+        setActionError(toMessage(err));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [store, product]
+  );
+
   return {
     loading: store.loading,
     error: store.error,
@@ -102,7 +128,11 @@ export function useProductDetailPage(id: string): ProductDetailViewModel {
     allowedTransitions,
     canEdit,
     canDelete,
+    history: history.entries,
+    historyLoading: history.loading,
+    historyError: history.error,
     changeStatus,
     deleteProduct,
+    restore,
   };
 }

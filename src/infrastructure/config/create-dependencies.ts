@@ -2,6 +2,9 @@ import { systemClock } from '@/domain/ports/clock';
 import type { AppDependencies } from '@/di/dependencies';
 import { FabricAuthService } from '@/infrastructure/auth/fabric-auth-service';
 import { MockAuthService } from '@/infrastructure/auth/mock-auth-service';
+import { ChangeLoggingCustomerRepository } from '@/infrastructure/data/change-logging-customer-repository';
+import { ChangeLoggingProductRepository } from '@/infrastructure/data/change-logging-product-repository';
+import { RayfinChangeLogRepository } from '@/infrastructure/data/rayfin-change-log-repository';
 import { RayfinCustomerRepository } from '@/infrastructure/data/rayfin-customer-repository';
 import { RayfinProductRepository } from '@/infrastructure/data/rayfin-product-repository';
 import { createRayfinClient } from '@/infrastructure/rayfin/client';
@@ -33,10 +36,32 @@ export function createAppDependencies(
           returnOrigin: window.location.origin,
         });
 
+  // Resolve the acting user for audit trails from the current session.
+  const actor = (): string | undefined => {
+    const { user } = facade.getSession();
+    return user?.email ?? user?.id ?? undefined;
+  };
+
+  const changeLog = new RayfinChangeLogRepository(facade, clock);
+
+  // Wrap the base repositories so every mutation records change history,
+  // transparently to the use-case layer (both share the domain port).
+  const customers = new ChangeLoggingCustomerRepository(
+    new RayfinCustomerRepository(facade, clock),
+    changeLog,
+    actor
+  );
+  const products = new ChangeLoggingProductRepository(
+    new RayfinProductRepository(facade, clock),
+    changeLog,
+    actor
+  );
+
   return {
     auth,
-    customers: new RayfinCustomerRepository(facade, clock),
-    products: new RayfinProductRepository(facade, clock),
+    customers,
+    products,
+    changeLog,
     clock,
     fabricAuthEnabled: auth.fabricAuthEnabled,
   };

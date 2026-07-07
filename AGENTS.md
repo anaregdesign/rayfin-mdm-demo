@@ -119,6 +119,38 @@ To add a screen/tab: create a render-only component under
 `src/App.tsx`, and add the `NAV_ITEMS` entry in
 `src/components/layout/AppShell.tsx`. Keep all labels/copy in Japanese.
 
+### Change history & audit (Issue #5)
+
+Every customer/product mutation is recorded as an immutable `ChangeLog` entry and
+surfaced as a rollback-capable timeline on the detail pages. The design keeps use
+cases and views unaware of auditing:
+
+- **Platform:** `rayfin/data/ChangeLog.ts` (`@authenticated('*')`) stores
+  `entityType`/`entityId`/`action`/`changedFields` (JSON string, `@text max 8000`)
+  `/actorId`/`summary`/`occurredAt`. Registered in `schema.ts` (additive — safe on
+  `rayfin up`, no `--force`).
+- **Pure diff engine:** `src/domain/policies/diff-policy.ts` — `diffRecords` emits a
+  stable, ordered `FieldChange[]` (audit/identity fields in `IGNORED_DIFF_FIELDS`
+  are skipped; `''`/`null`/`undefined` are treated as equal), and `revertChanges`
+  applies the `before` side to undo an edit. Fully unit-tested
+  (`domain/policies/__tests__/diff-policy.test.ts`).
+- **Decorator-audit convention.** Auditing is layered with the **decorator
+  pattern**, not baked into the base repos: `ChangeLoggingCustomerRepository` /
+  `ChangeLoggingProductRepository` wrap the canonical Rayfin repos behind the same
+  `CustomerRepository`/`ProductRepository` port, compute the diff, and append a
+  `ChangeLog` row. Wiring lives in `create-dependencies.ts` (a shared `actor`
+  closure resolves the current user's email/id). Audit writes are **non-fatal** —
+  `safeAppend` swallows+logs errors so a logging failure never breaks the mutation
+  (a pragmatic PoC integrity trade-off).
+- **Rollback.** The detail VM's `restore(entry)` reverts via
+  `revertChanges(*ToInput(current), entry.changes)` → `store.update*`. The restore
+  itself is audited as a new `update` entry, and the timeline auto-refreshes
+  because the resulting `updatedAt` change bumps the hook's `reloadKey`.
+- **View surface:** `useChangeHistory(entityType, id, reloadKey)` →
+  `HistoryTimeline`/`FieldDiffRow` (render-only). When adding a new auditable
+  master, wrap its repo with a logging decorator in the composition root — do not
+  add audit calls inside use cases or components.
+
 ### Deployment (Fabric)
 
 The PoC is deployed to Microsoft Fabric. Deploy with `npx rayfin up -y` from the
@@ -241,10 +273,11 @@ The PoC is measured against the **12-domain general MDM functional requirements*
 laid out at project kickoff. Current breadth is **~45–50%** (core/MVP scope
 ~90%). Coverage by domain:
 
-- ✅ **Implemented (4):** データモデリング / データ品質 / 検索・参照 / 分析・レポート.
-- 🔶 **Partial (5):** オンボーディング (manual only) / 名寄せ (detection only, **no
-  merge**) / ガバナンス (steward + lifecycle) / バージョン管理 (last-write audit only)
-  / セキュリティ (authn only, `@authenticated('*')`).
+- ✅ **Implemented (5):** データモデリング / データ品質 / 検索・参照 / 分析・レポート /
+  バージョン管理（変更履歴・フィールド差分・ロールバック, #5）.
+- 🔶 **Partial (4):** オンボーディング (manual only) / 名寄せ (detection only, **no
+  merge**) / ガバナンス (steward + lifecycle) / セキュリティ (authn only,
+  `@authenticated('*')`).
 - ❌ **Not implemented (3):** 階層・関係管理 / ワークフロー・承認 / 配信・連携.
 
 **Tracking:** the coverage matrix and roadmap live in **Epic #3**
@@ -255,7 +288,7 @@ clean-architecture layer map above):
 | Pri | Issue | Domain / gap | `area:` label |
 | --- | ----- | ------------ | ------------- |
 | P1 | #4  | 名寄せ: マージ実行・survivorship・ゴールデンレコード | `matching` |
-| P1 | #5  | 変更履歴・バージョン管理（フィールド差分・タイムライン） | `versioning` |
+| P1 | #5  | 変更履歴・バージョン管理（フィールド差分・タイムライン） ✅ **done** | `versioning` |
 | P1 | #6  | 一括インポート/エクスポート（CSV） | `onboarding` |
 | P2 | #7  | 階層・関係管理（企業グループ／製品カテゴリ／顧客拠点） | `hierarchy` |
 | P2 | #8  | 変更承認ワークフロー（maker-checker） | `workflow` |
