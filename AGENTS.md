@@ -234,3 +234,40 @@ npm run seed        # → scripts/seed.mjs
   three duplicate pairs — customers sharing an email, customers whose names differ
   only by the 会/會 kanji variant, and products sharing a barcode + near-identical
   name. `mssql` is a **devDependency** only (not bundled into the app).
+
+### Roadmap & coverage (planned enhancements)
+
+The PoC is measured against the **12-domain general MDM functional requirements**
+laid out at project kickoff. Current breadth is **~45–50%** (core/MVP scope
+~90%). Coverage by domain:
+
+- ✅ **Implemented (4):** データモデリング / データ品質 / 検索・参照 / 分析・レポート.
+- 🔶 **Partial (5):** オンボーディング (manual only) / 名寄せ (detection only, **no
+  merge**) / ガバナンス (steward + lifecycle) / バージョン管理 (last-write audit only)
+  / セキュリティ (authn only, `@authenticated('*')`).
+- ❌ **Not implemented (3):** 階層・関係管理 / ワークフロー・承認 / 配信・連携.
+
+**Tracking:** the coverage matrix and roadmap live in **Epic #3**
+(`[Epic] MDM機能カバレッジと不足機能の実装ロードマップ`) — the single source of
+truth. Ten child issues carry per-gap implementation plans (each written to the
+clean-architecture layer map above):
+
+| Pri | Issue | Domain / gap | `area:` label |
+| --- | ----- | ------------ | ------------- |
+| P1 | #4  | 名寄せ: マージ実行・survivorship・ゴールデンレコード | `matching` |
+| P1 | #5  | 変更履歴・バージョン管理（フィールド差分・タイムライン） | `versioning` |
+| P1 | #6  | 一括インポート/エクスポート（CSV） | `onboarding` |
+| P2 | #7  | 階層・関係管理（企業グループ／製品カテゴリ／顧客拠点） | `hierarchy` |
+| P2 | #8  | 変更承認ワークフロー（maker-checker） | `workflow` |
+| P2 | #9  | ロールベース認可・行レベルセキュリティ（@role/RLS） | `security` |
+| P2 | #10 | スチュワードシップ・ワークキュー | `governance` |
+| P3 | #11 | データ品質ルール拡張（標準化・クレンジング・是正キュー） | `quality` |
+| P3 | #12 | 配信・連携（下流公開・Webhook/イベント・API） | `distribution` |
+| P3 | #13 | 分析強化（品質トレンド・時系列・レポート出力） | `analytics` |
+
+When picking up feature work: start from the relevant child issue, follow its
+per-layer plan and the **Layer map** / **Conventions** above, keep new copy in
+Japanese, and tick the item off the Epic #3 checklist when done. Dependencies to
+respect — #13 (analytics trends) needs #5 (change history); #12 (distribution)
+reuses #6's CSV lib and #5's write-hook; #10/#8 align with #9's roles. Labels
+`epic`, `priority:P1–P3`, and `area:*` already exist in the repo (`gh label list`).
