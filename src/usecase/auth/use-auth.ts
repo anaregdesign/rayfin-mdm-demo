@@ -20,6 +20,13 @@ export interface AuthContextValue {
   activeRole: Role;
   setActiveRole: (role: Role) => void;
   /**
+   * Demo toggle for the maker-checker approval workflow (#8). When ON, form
+   * saves raise a pending change request instead of writing directly. Owned by
+   * the app layer (not the auth port) — it is a UX affordance, not identity.
+   */
+  requireApproval: boolean;
+  setRequireApproval: (value: boolean) => void;
+  /**
    * Convenience actor (identity + active role) consumed by view-models when
    * calling the access policy. Null when unauthenticated.
    */

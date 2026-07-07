@@ -13,7 +13,9 @@ import {
   type CustomerField,
 } from '@/domain/policies/customer-validation';
 import { can } from '@/domain/policies/access-policy';
+import { useDependencies } from '@/di/dependencies';
 import { toMessage } from '@/lib/errors';
+import type { SubmitOutcome } from '@/usecase/shared/submit-outcome';
 
 import { useCustomers } from './use-customers';
 import { useAuth } from '@/usecase/auth/use-auth';
@@ -30,8 +32,13 @@ export interface CustomerFormViewModel {
   notFound: boolean;
   /** False when the active role may not create (new) or edit this record. */
   permitted: boolean;
+  /**
+   * True when the approval workflow is engaged, so a submit raises a change
+   * request for review instead of writing immediately (drives button copy).
+   */
+  approvalRequired: boolean;
   setField: <K extends CustomerField>(key: K, value: CustomerInput[K]) => void;
-  submit: () => Promise<Customer | null>;
+  submit: () => Promise<SubmitOutcome<Customer>>;
 }
 
 /**
@@ -41,7 +48,8 @@ export interface CustomerFormViewModel {
  */
 export function useCustomerForm(editId?: string): CustomerFormViewModel {
   const store = useCustomers();
-  const { actor } = useAuth();
+  const { actor, requireApproval } = useAuth();
+  const { changeRequests } = useDependencies();
   const [draft, setDraft] = useState<CustomerInput>(emptyCustomerInput);
   const [touched, setTouched] = useState<Set<CustomerField>>(new Set());
   const [submitAttempted, setSubmitAttempted] = useState(false);
@@ -85,24 +93,36 @@ export function useCustomerForm(editId?: string): CustomerFormViewModel {
     []
   );
 
-  const submit = useCallback(async () => {
+  const submit = useCallback(async (): Promise<SubmitOutcome<Customer>> => {
     setSubmitAttempted(true);
-    if (!validation.valid) return null;
+    if (!validation.valid) return { status: 'invalid' };
     setSaving(true);
     setSubmitError(null);
     try {
-      const saved =
+      // Approval workflow ON → raise a pending request instead of writing.
+      if (requireApproval) {
+        await changeRequests.raise({
+          entityType: 'customer',
+          entityId: editId,
+          operation: editId != null ? 'update' : 'create',
+          payload: draft as unknown as Record<string, unknown>,
+          requestedBy: actor?.email ?? actor?.id,
+          summary: draft.name,
+        });
+        return { status: 'requested' };
+      }
+      const record =
         editId != null
           ? await store.updateCustomer(editId, draft)
           : await store.createCustomer(draft);
-      return saved;
+      return { status: 'saved', record };
     } catch (err) {
       setSubmitError(toMessage(err));
-      return null;
+      return { status: 'error' };
     } finally {
       setSaving(false);
     }
-  }, [validation.valid, editId, store, draft]);
+  }, [validation.valid, editId, store, draft, requireApproval, changeRequests, actor]);
 
   const isEdit = editId != null;
   const notFound = isEdit && !store.loading && !existing;
@@ -128,6 +148,7 @@ export function useCustomerForm(editId?: string): CustomerFormViewModel {
     isEdit,
     notFound,
     permitted,
+    approvalRequired: requireApproval,
     setField,
     submit,
   };

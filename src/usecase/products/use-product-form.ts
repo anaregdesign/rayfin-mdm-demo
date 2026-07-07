@@ -10,7 +10,9 @@ import {
   type ProductField,
 } from '@/domain/policies/product-validation';
 import { can } from '@/domain/policies/access-policy';
+import { useDependencies } from '@/di/dependencies';
 import { toMessage } from '@/lib/errors';
+import type { SubmitOutcome } from '@/usecase/shared/submit-outcome';
 
 import { useProducts } from './use-products';
 import { useAuth } from '@/usecase/auth/use-auth';
@@ -27,8 +29,13 @@ export interface ProductFormViewModel {
   notFound: boolean;
   /** False when the active role may not create (new) or edit this record. */
   permitted: boolean;
+  /**
+   * True when the approval workflow is engaged, so a submit raises a change
+   * request for review instead of writing immediately (drives button copy).
+   */
+  approvalRequired: boolean;
   setField: <K extends ProductField>(key: K, value: ProductInput[K]) => void;
-  submit: () => Promise<Product | null>;
+  submit: () => Promise<SubmitOutcome<Product>>;
 }
 
 /**
@@ -38,7 +45,8 @@ export interface ProductFormViewModel {
  */
 export function useProductForm(editId?: string): ProductFormViewModel {
   const store = useProducts();
-  const { actor } = useAuth();
+  const { actor, requireApproval } = useAuth();
+  const { changeRequests } = useDependencies();
   const [draft, setDraft] = useState<ProductInput>(emptyProductInput);
   const [touched, setTouched] = useState<Set<ProductField>>(new Set());
   const [submitAttempted, setSubmitAttempted] = useState(false);
@@ -82,24 +90,36 @@ export function useProductForm(editId?: string): ProductFormViewModel {
     []
   );
 
-  const submit = useCallback(async () => {
+  const submit = useCallback(async (): Promise<SubmitOutcome<Product>> => {
     setSubmitAttempted(true);
-    if (!validation.valid) return null;
+    if (!validation.valid) return { status: 'invalid' };
     setSaving(true);
     setSubmitError(null);
     try {
-      const saved =
+      // Approval workflow ON → raise a pending request instead of writing.
+      if (requireApproval) {
+        await changeRequests.raise({
+          entityType: 'product',
+          entityId: editId,
+          operation: editId != null ? 'update' : 'create',
+          payload: draft as unknown as Record<string, unknown>,
+          requestedBy: actor?.email ?? actor?.id,
+          summary: draft.name,
+        });
+        return { status: 'requested' };
+      }
+      const record =
         editId != null
           ? await store.updateProduct(editId, draft)
           : await store.createProduct(draft);
-      return saved;
+      return { status: 'saved', record };
     } catch (err) {
       setSubmitError(toMessage(err));
-      return null;
+      return { status: 'error' };
     } finally {
       setSaving(false);
     }
-  }, [validation.valid, editId, store, draft]);
+  }, [validation.valid, editId, store, draft, requireApproval, changeRequests, actor]);
 
   const isEdit = editId != null;
   const notFound = isEdit && !store.loading && !existing;
@@ -125,6 +145,7 @@ export function useProductForm(editId?: string): ProductFormViewModel {
     isEdit,
     notFound,
     permitted,
+    approvalRequired: requireApproval,
     setField,
     submit,
   };

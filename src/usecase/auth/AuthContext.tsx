@@ -28,6 +28,7 @@ export function AuthProvider({ children, authService }: AuthProviderProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeRole, setActiveRole] = useState<Role>('viewer');
+  const [requireApproval, setRequireApproval] = useState(false);
 
   // When the signed-in identity changes, reset the effective role to the
   // highest role it was granted (demo switcher can then step down/up).
@@ -101,9 +102,11 @@ export function AuthProvider({ children, authService }: AuthProviderProps) {
       grantedRoles: user?.roles ?? [],
       activeRole,
       setActiveRole,
+      requireApproval,
+      setRequireApproval,
       actor,
     }),
-    [user, loading, error, signIn, signOut, authService, activeRole, actor]
+    [user, loading, error, signIn, signOut, authService, activeRole, requireApproval, actor]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
