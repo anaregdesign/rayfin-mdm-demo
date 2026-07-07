@@ -151,6 +151,63 @@ cases and views unaware of auditing:
   master, wrap its repo with a logging decorator in the composition root — do not
   add audit calls inside use cases or components.
 
+### Merge & survivorship (Issue #4)
+
+Two duplicate master records can be collapsed into one surviving **golden
+record** from the 360° detail page, and every merge is a **reversible**
+`MergeRecord`. The write path stays entirely inside the use-case layer; the
+detail store, auditing, and status changes are all reused rather than
+duplicated.
+
+- **Platform:** `rayfin/data/MergeRecord.ts` (`@authenticated('*')`) stores the
+  reversible snapshot — `entityType`/`winnerId`/`loserIds`
+  (JSON `string[]`)/`fieldSources` (JSON field→`winner|loser`)/`winnerBefore`
+  (JSON of the winner's pre-merge input)/`loserStatuses` (JSON loserId→prior
+  status)/`performedBy`/`performedAt`/`undoneAt`. Registered in `schema.ts`
+  (additive — safe on `rayfin up`). The loser lifecycle adds a system-only
+  `merged` status (in the status union + `*_STATUS_META` badges, but **not** in
+  `*_STATUS_VALUES` so forms/filters can't pick it; `merged` is terminal —
+  only unmerge exits it, and merged records are not editable/deletable).
+- **Pure survivorship policy:** `src/domain/policies/merge-policy.ts` —
+  `isEmptyValue` (blank/null/undefined empty; **0 and false are NOT empty**),
+  `mergeableFields` (union of keys minus `status`), `defaultFieldSources`
+  (seeds each field from a `SurvivorshipStrategy` — `winner` / `newer`
+  (via `winnerNewer`) / `nonEmpty` completeness-fill), `buildResolutions`,
+  `applyResolutions` (composes the golden record, never mutates inputs), and
+  `canMerge` (rejects self-merge/empty ids). Fully unit-tested
+  (`domain/policies/__tests__/merge-policy.test.ts`).
+- **Merge lives in the use case, delegated via gateways.**
+  `src/usecase/merge/use-merge.ts` (`useMerge(entityType, gateways)`) is
+  store-agnostic and orchestrates: apply resolutions → golden → `applyGolden`
+  (audited winner update) → `markMerged` (loser) → append a `MergeRecord`
+  snapshot → reload. `unmerge` replays the snapshot: restore the winner from
+  `winnerBefore`, `restoreMerged` each loser to its prior status, `markUndone`.
+  Each detail VM injects the gateways (`applyGolden`/`markMerged`/
+  `restoreMerged`/`reload`/`onBusy`/`onError`) so **merge reuses the detail VM's
+  own store instance** — critical because `useCustomers()`/`useProducts()` are
+  plain (non-context) hooks, so spinning up a fresh store here would desync the
+  screen. `performedBy` is stamped **by the repo** from the session, keeping the
+  session out of the use case.
+- **Pure view-plan:** `src/usecase/merge/merge-plan.ts` — `buildMergePlan`
+  returns a `MergePlan` whose `computeDefaults(strategy)` is an **injected
+  closure**, so `MergeDialog` re-seeds field sources on strategy change without
+  importing any policy. The dialog imports only domain enums/labels
+  (`SURVIVORSHIP_STRATEGY_VALUES`, `survivorshipStrategyLabel`) — no business
+  logic in the view.
+- **View surface:** `components/merge/MergeDialog.tsx` (side-by-side
+  survivorship editor) + `components/merge/MergeHistoryPanel.tsx` (undo).
+  `DuplicatePanel` gained optional `currentId` + `renderAction` props so each
+  duplicate pair renders a「統合」button targeting the counterpart; the detail
+  page holds the `mergeTargetId`/plan state and drives the dialog. The winner is
+  always the record you opened (open merge from the record you want to keep).
+- **Reversibility is best-effort (PoC).** The merge write sequence is
+  non-atomic (golden → markMerged → append record); a mid-sequence failure is
+  surfaced via `onError` but not rolled back automatically — the `MergeRecord`
+  snapshot is what makes a later manual unmerge possible. Its infra mapper
+  (`merge-record-mapper.ts`) parses every JSON column defensively (malformed →
+  safe default) so the history panel never crashes; round-trip tested
+  (`infrastructure/data/__tests__/merge-record-mapper.test.ts`).
+
 ### Deployment (Fabric)
 
 The PoC is deployed to Microsoft Fabric. Deploy with `npx rayfin up -y` from the
@@ -273,11 +330,11 @@ The PoC is measured against the **12-domain general MDM functional requirements*
 laid out at project kickoff. Current breadth is **~45–50%** (core/MVP scope
 ~90%). Coverage by domain:
 
-- ✅ **Implemented (5):** データモデリング / データ品質 / 検索・参照 / 分析・レポート /
-  バージョン管理（変更履歴・フィールド差分・ロールバック, #5）.
-- 🔶 **Partial (4):** オンボーディング (manual only) / 名寄せ (detection only, **no
-  merge**) / ガバナンス (steward + lifecycle) / セキュリティ (authn only,
-  `@authenticated('*')`).
+- ✅ **Implemented (6):** データモデリング / データ品質 / 検索・参照 / 分析・レポート /
+  バージョン管理（変更履歴・フィールド差分・ロールバック, #5） /
+  名寄せ（重複検出＋マージ実行・survivorship・ゴールデンレコード・統合解除, #4）.
+- 🔶 **Partial (3):** オンボーディング (manual only) / ガバナンス (steward +
+  lifecycle) / セキュリティ (authn only, `@authenticated('*')`).
 - ❌ **Not implemented (3):** 階層・関係管理 / ワークフロー・承認 / 配信・連携.
 
 **Tracking:** the coverage matrix and roadmap live in **Epic #3**
@@ -287,7 +344,7 @@ clean-architecture layer map above):
 
 | Pri | Issue | Domain / gap | `area:` label |
 | --- | ----- | ------------ | ------------- |
-| P1 | #4  | 名寄せ: マージ実行・survivorship・ゴールデンレコード | `matching` |
+| P1 | #4  | 名寄せ: マージ実行・survivorship・ゴールデンレコード ✅ **done** | `matching` |
 | P1 | #5  | 変更履歴・バージョン管理（フィールド差分・タイムライン） ✅ **done** | `versioning` |
 | P1 | #6  | 一括インポート/エクスポート（CSV） | `onboarding` |
 | P2 | #7  | 階層・関係管理（企業グループ／製品カテゴリ／顧客拠点） | `hierarchy` |

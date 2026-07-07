@@ -22,6 +22,10 @@ export interface Product {
   status: ProductStatus;
   steward?: string;
   notes?: string;
+  /** When status is 'merged', the winner (surviving) product id. */
+  mergedInto?: string;
+  /** When status is 'merged', when the merge happened. */
+  mergedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
   createdBy?: string;

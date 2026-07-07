@@ -4,12 +4,15 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { CustomerDetailCard } from '@/components/customer/CustomerDetailCard';
 import { CustomerStatusActions } from '@/components/customer/CustomerStatusActions';
 import { HistoryTimeline } from '@/components/history/HistoryTimeline';
+import { MergeDialog } from '@/components/merge/MergeDialog';
+import { MergeHistoryPanel } from '@/components/merge/MergeHistoryPanel';
 import { Button } from '@/components/shared/Button';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DuplicatePanel } from '@/components/shared/DuplicatePanel';
 import { ErrorState } from '@/components/shared/ErrorState';
 import { LoadingState } from '@/components/shared/LoadingState';
 import { PageHeader } from '@/components/shared/PageHeader';
+import type { MergePlan } from '@/usecase/merge/merge-plan';
 import { useCustomerDetailPage } from '@/usecase/customers/use-customer-detail-page';
 
 /** 360° customer view with lifecycle actions and duplicate insight. */
@@ -18,6 +21,7 @@ export function CustomerDetailPage() {
   const navigate = useNavigate();
   const vm = useCustomerDetailPage(id);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [mergePlan, setMergePlan] = useState<MergePlan | null>(null);
 
   if (vm.loading) return <LoadingState />;
 
@@ -36,6 +40,14 @@ export function CustomerDetailPage() {
     const ok = await vm.deleteCustomer();
     setConfirmOpen(false);
     if (ok) navigate('/customers');
+  };
+
+  const handleConfirmMerge = async (
+    sources: Parameters<typeof vm.confirmMerge>[1]
+  ) => {
+    if (!mergePlan) return;
+    const ok = await vm.confirmMerge(mergePlan.loserId, sources);
+    if (ok) setMergePlan(null);
   };
 
   return (
@@ -78,6 +90,7 @@ export function CustomerDetailPage() {
       <DuplicatePanel
         title="この顧客の重複候補"
         pairs={vm.duplicatePairs}
+        currentId={vm.customer.id}
         renderRef={(refId, label) =>
           refId === vm.customer!.id ? (
             <span>{label}</span>
@@ -90,6 +103,19 @@ export function CustomerDetailPage() {
             </button>
           )
         }
+        renderAction={
+          vm.canEdit
+            ? (otherId) => (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setMergePlan(vm.planMerge(otherId))}
+                >
+                  統合
+                </Button>
+              )
+            : undefined
+        }
       />
 
       <HistoryTimeline
@@ -99,6 +125,23 @@ export function CustomerDetailPage() {
         error={vm.historyError}
         busy={vm.busy}
         onRestore={vm.restore}
+      />
+
+      <MergeHistoryPanel
+        items={vm.mergeHistory}
+        loading={vm.mergeHistoryLoading}
+        error={vm.mergeHistoryError}
+        busy={vm.busy}
+        onUndo={vm.unmerge}
+      />
+
+      <MergeDialog
+        open={mergePlan !== null}
+        plan={mergePlan}
+        busy={vm.busy}
+        error={vm.actionError}
+        onConfirm={handleConfirmMerge}
+        onCancel={() => setMergePlan(null)}
       />
 
       <ConfirmDialog

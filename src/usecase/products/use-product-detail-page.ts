@@ -2,7 +2,8 @@ import { useCallback, useMemo, useState } from 'react';
 
 import type { ChangeEntry } from '@/domain/models/change-log';
 import type { ProductStatus } from '@/domain/models/master-status';
-import { productToInput, type Product } from '@/domain/models/product';
+import { isMergeActive, type MergeFieldSource } from '@/domain/models/merge';
+import { productToInput, type Product, type ProductInput } from '@/domain/models/product';
 import type { DuplicatePair } from '@/domain/models/duplicate';
 import type { QualityResult } from '@/domain/models/quality';
 import {
@@ -16,8 +17,15 @@ import {
   canDeleteProduct,
   canEditProduct,
 } from '@/domain/policies/product-status-policy';
+import { useDependencies } from '@/di/dependencies';
 import { toMessage } from '@/lib/errors';
 import { useChangeHistory } from '@/usecase/history/use-change-history';
+import {
+  buildMergePlan,
+  type MergeHistoryItem,
+  type MergePlan,
+} from '@/usecase/merge/merge-plan';
+import { useMerge, type MergeGateways } from '@/usecase/merge/use-merge';
 
 import { useProducts } from './use-products';
 
@@ -35,14 +43,24 @@ export interface ProductDetailViewModel {
   history: ChangeEntry[];
   historyLoading: boolean;
   historyError: string | null;
+  mergeHistory: MergeHistoryItem[];
+  mergeHistoryLoading: boolean;
+  mergeHistoryError: string | null;
   changeStatus: (status: ProductStatus) => Promise<void>;
   deleteProduct: () => Promise<boolean>;
   restore: (entry: ChangeEntry) => Promise<void>;
+  planMerge: (loserId: string) => MergePlan | null;
+  confirmMerge: (
+    loserId: string,
+    sources: Record<string, MergeFieldSource>
+  ) => Promise<boolean>;
+  unmerge: (recordId: string) => Promise<boolean>;
 }
 
 /** Orchestrates the 360° product detail screen and its lifecycle actions. */
 export function useProductDetailPage(id: string): ProductDetailViewModel {
   const store = useProducts();
+  const deps = useDependencies();
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -117,6 +135,86 @@ export function useProductDetailPage(id: string): ProductDetailViewModel {
     [store, product]
   );
 
+  const mergeGateways = useMemo<MergeGateways>(
+    () => ({
+      applyGolden: (winnerId, golden) =>
+        store.updateProduct(winnerId, golden as unknown as ProductInput),
+      markMerged: (loserId, winnerId) =>
+        deps.products.markMerged(loserId, winnerId),
+      restoreMerged: (loserId, status) =>
+        deps.products.restoreMerged(loserId, status as ProductStatus),
+      reload: () => store.reload(),
+      onBusy: setBusy,
+      onError: setActionError,
+    }),
+    [store, deps.products]
+  );
+
+  const mergeCtl = useMerge('product', mergeGateways);
+
+  const nameOf = useCallback(
+    (productId: string) =>
+      store.products.find((p) => p.id === productId)?.name ?? productId,
+    [store.products]
+  );
+
+  const mergeHistory = useMemo<MergeHistoryItem[]>(
+    () =>
+      mergeCtl.history.map((record) => ({
+        id: record.id,
+        winnerLabel: nameOf(record.winnerId),
+        loserLabels: record.loserIds.map(nameOf),
+        performedBy: record.performedBy,
+        performedAt: record.performedAt,
+        active: isMergeActive(record),
+      })),
+    [mergeCtl.history, nameOf]
+  );
+
+  const planMerge = useCallback(
+    (loserId: string): MergePlan | null => {
+      const loser = store.products.find((p) => p.id === loserId);
+      if (!product || !loser) return null;
+      return buildMergePlan(
+        'product',
+        {
+          id: product.id,
+          label: product.name,
+          input: productToInput(product) as unknown as Record<string, unknown>,
+          updatedAt: product.updatedAt,
+        },
+        {
+          id: loser.id,
+          label: loser.name,
+          input: productToInput(loser) as unknown as Record<string, unknown>,
+          updatedAt: loser.updatedAt,
+        }
+      );
+    },
+    [product, store.products]
+  );
+
+  const confirmMerge = useCallback(
+    async (loserId: string, sources: Record<string, MergeFieldSource>) => {
+      const loser = store.products.find((p) => p.id === loserId);
+      if (!product || !loser) return false;
+      return mergeCtl.merge(
+        {
+          id: product.id,
+          status: product.status,
+          input: productToInput(product) as unknown as Record<string, unknown>,
+        },
+        {
+          id: loser.id,
+          status: loser.status,
+          input: productToInput(loser) as unknown as Record<string, unknown>,
+        },
+        sources
+      );
+    },
+    [product, store.products, mergeCtl]
+  );
+
   return {
     loading: store.loading,
     error: store.error,
@@ -131,8 +229,14 @@ export function useProductDetailPage(id: string): ProductDetailViewModel {
     history: history.entries,
     historyLoading: history.loading,
     historyError: history.error,
+    mergeHistory,
+    mergeHistoryLoading: mergeCtl.historyLoading,
+    mergeHistoryError: mergeCtl.historyError,
     changeStatus,
     deleteProduct,
     restore,
+    planMerge,
+    confirmMerge,
+    unmerge: mergeCtl.unmerge,
   };
 }
