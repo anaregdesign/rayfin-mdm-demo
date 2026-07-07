@@ -1,0 +1,108 @@
+name: Deploy to Fabric
+
+# Continuous deployment to Microsoft Fabric.
+#
+# Auth model (no stored client secret — the repo is public):
+#   GitHub OIDC  ->  azure/login (federated credential on the Entra app)
+#   ->  az account get-access-token (Fabric resource, app-only)
+#   ->  RAYFIN_TOKEN (ambient bearer token consumed by the rayfin CLI)
+#   ->  rayfin up  (creates/updates the existing "mdm" AppBackend, applies the
+#                   data schema, builds & publishes the static web app)
+#
+# The Entra service principal needs NO Azure subscription/RBAC — Fabric
+# authorizes it via the org-wide "service principals can call Fabric APIs"
+# tenant setting plus its Admin role on the target workspace.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Never cancel a deploy that is already in flight (avoid partial state); queue
+# instead so runs apply in order.
+concurrency:
+  group: deploy-fabric
+  cancel-in-progress: false
+
+permissions:
+  id-token: write   # required for OIDC federated credential exchange
+  contents: read
+
+jobs:
+  deploy:
+    name: Build & deploy
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://agile-grass-98ac1097eb-japaneast.webapp.fabricapps.net
+    env:
+      FABRIC_RESOURCE: https://api.fabric.microsoft.com
+      LIVE_URL: https://agile-grass-98ac1097eb-japaneast.webapp.fabricapps.net
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Fail fast before touching the cloud: same gates as CI.
+      - name: Lint (eslint)
+        run: npm run lint
+
+      - name: Typecheck (tsc -b)
+        run: npx tsc -b
+
+      - name: Test (vitest)
+        run: npm test
+
+      - name: Azure login (OIDC, no subscription)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+
+      # Mint an app-only Fabric access token and hand it to the rayfin CLI as an
+      # ambient bearer token. The token is masked so it never appears in logs.
+      - name: Acquire Fabric token
+        run: |
+          set -euo pipefail
+          TOKEN="$(az account get-access-token \
+            --resource "$FABRIC_RESOURCE" \
+            --tenant "${{ secrets.AZURE_TENANT_ID }}" \
+            --query accessToken -o tsv)"
+          if [ -z "$TOKEN" ]; then
+            echo "::error::Failed to acquire Fabric access token"; exit 1
+          fi
+          echo "::add-mask::$TOKEN"
+          {
+            echo "RAYFIN_TOKEN=$TOKEN"
+            echo "RAYFIN_TENANT_ID=${{ secrets.AZURE_TENANT_ID }}"
+          } >> "$GITHUB_ENV"
+          echo "Fabric token acquired (${#TOKEN} chars)."
+
+      # Deploy. rayfin resolves the existing "mdm" item by display name in the
+      # target workspace and updates it in place (idempotent — no duplicate).
+      # rayfin injects the real RAYFIN_PUBLIC_* values during its own build step.
+      - name: Deploy with rayfin up
+        run: npx rayfin up -y --workspace-id ${{ vars.FABRIC_WORKSPACE_ID }}
+
+      # Verify the live site serves HTTP 200 (allow for CDN propagation).
+      - name: Smoke test (live URL)
+        run: |
+          set -uo pipefail
+          echo "Probing $LIVE_URL ..."
+          for i in 1 2 3 4 5 6; do
+            code="$(curl -s -o /dev/null -w '%{http_code}' "$LIVE_URL" || echo 000)"
+            echo "attempt $i -> HTTP $code"
+            if [ "$code" = "200" ]; then
+              echo "Live site healthy (HTTP 200)."; exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::Live site did not return HTTP 200 after retries"; exit 1
