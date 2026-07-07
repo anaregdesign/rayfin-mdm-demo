@@ -8,6 +8,7 @@ import { QualityOverview } from '@/components/dashboard/QualityOverview';
 import { RecentActivity } from '@/components/dashboard/RecentActivity';
 import { StatusBreakdown } from '@/components/dashboard/StatusBreakdown';
 import { SummaryCards } from '@/components/dashboard/SummaryCards';
+import { StewardWorkloadTable } from '@/components/workqueue/StewardWorkloadTable';
 import { useDashboard } from '@/usecase/dashboard/use-dashboard';
 
 /** Analytics overview across both masters (counts, quality, duplicates). */
@@ -51,6 +52,12 @@ export function DashboardPage() {
           total={vm.productSummary.total}
         />
       </div>
+
+      <StewardWorkloadTable
+        title="スチュワード別 未対応件数"
+        workloads={vm.stewardWorkloads}
+        description="品質・重複・下書き滞留・必須未入力などで対応が必要なレコードの担当者別件数です。詳細はワークキューを参照してください。"
+      />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <RecentActivity

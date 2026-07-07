@@ -412,6 +412,47 @@ existing records and the CSV round-trip are untouched.
   the product detail shows the root→self「カテゴリ階層」breadcrumb (`categoryPath`) — both
   computed in the product VMs via `ancestorsOf`, never in the view.
 
+### Steward workqueue (Issue #10)
+
+A prioritized, cross-master **"needs attention" queue** for data stewards. It is a
+pure *composition* of the policies you already have — **no new persisted entity** —
+so it stays correct automatically as the underlying quality/duplicate/validation
+rules evolve.
+
+- **The queue is a derived signal, never stored.** `src/domain/models/steward-task.ts`
+  defines a route-free `StewardTask` (one per record, id `${entityType}:${recordId}`,
+  aggregating every reason it matched) + the `TaskReason` union
+  (`missing_required`/`low_quality`/`duplicate`/`stale_draft` with JP
+  labels/descriptions/tones) + `StewardWorkload`. `src/domain/policies/steward-task-policy.ts`
+  is pure and **composes existing policies** — `evaluate*Quality`, `find*Duplicates`
+  + `duplicateIdSet`, `validate*Input` (fed via `*ToInput`), `*StatusLabel`. Do **not**
+  re-derive quality/dedup/validation here; call the canonical policy. **20 unit tests**
+  lock every reason rule, the merged/archived exclusion, the severity ordering
+  (`reasons.length*100 + (100 - qualityScore)`, ties → oldest `updatedAt` first), and
+  the workload grouping (incl. the null/unassigned bucket + busiest-first sort).
+- **`now` is injected for deterministic staleness.** `StewardTaskContext { now?,
+  qualityThreshold? (50), staleDraftDays? (14) }` — the policy never calls `new Date()`
+  itself when a context is supplied, so `stale_draft` is testable. Any future
+  time-based rule must take `now` the same way.
+- **The view-model owns navigation + writes; the policy stays route-free.**
+  `src/usecase/workqueue/use-steward-workqueue.ts` (`useStewardWorkqueuePage()`) composes
+  `useCustomers` + `useProducts` + `useAuth`, turns tasks into `WorkQueueRow`s
+  (computing `detailPath`/`editPath`), and applies filters (`WorkQueueScope`
+  all/mine/unassigned, `ReasonFilter`) + a selection `Set`. Bulk **assign** guards
+  **per record** with `can(actor, 'edit', record)` and writes via
+  `update{Customer,Product}({ ...toInput(record), steward: target })`, tallying
+  denied/failed — RBAC is enforced at the write, not just hidden in the UI. A stable
+  `now` is captured once via `useState(() => new Date())`.
+- **Render-only components, one per file.** `components/workqueue/`: `TaskReasonBadge`,
+  `WorkQueueList` (static `Link`s to detail/edit; selection checkbox only when
+  `canManage && row.canEdit`), `StewardAssignPicker` (bulk-assign bar),
+  `StewardWorkloadTable` (per-steward bars — **reused on the dashboard**). Thin
+  `pages/WorkQueuePage.tsx` + route `/workqueue` + `AppShell` nav「ワークキュー」.
+- **Dashboard rollup reuses the same policy + component.** `use-dashboard.ts` adds
+  `stewardWorkloads` via `stewardWorkloads(deriveStewardTasks(...))` (same pattern as the
+  existing `findCustomerDuplicates` call there) and `DashboardPage` renders
+  `StewardWorkloadTable` — the queue and the dashboard never diverge.
+
 ### Deployment (Fabric)
 
 The PoC is deployed to Microsoft Fabric. Deploy with `npx rayfin up -y` from the
@@ -531,17 +572,17 @@ npm run seed        # → scripts/seed.mjs
 ### Roadmap & coverage (planned enhancements)
 
 The PoC is measured against the **12-domain general MDM functional requirements**
-laid out at project kickoff. Current breadth is **~80–83%** (core/MVP scope
-~90%). Coverage by domain:
+laid out at project kickoff. Current breadth is **~90–92%** (core/MVP scope
+~95%). Coverage by domain:
 
-- ✅ **Implemented (10):** データモデリング / データ品質 / 検索・参照 / 分析・レポート /
+- ✅ **Implemented (11):** データモデリング / データ品質 / 検索・参照 / 分析・レポート /
   バージョン管理（変更履歴・フィールド差分・ロールバック, #5） /
   名寄せ（重複検出＋マージ実行・survivorship・ゴールデンレコード・統合解除, #4） /
   オンボーディング（手動フォーム＋CSV一括インポート/エクスポート・行検証プレビュー, #6） /
   セキュリティ（ロールベース認可・スチュワード行レベル制御・機密項目マスキング, クライアント側, #9） /
   ワークフロー・承認（maker-checker・承認キュー・職務分掌トグル・差分プレビュー, #8） /
-  階層・関係管理（顧客組織関係＋製品カテゴリマスタ・循環防止・ドリルダウン, #7）.
-- 🔶 **Partial (1):** ガバナンス (steward + lifecycle).
+  階層・関係管理（顧客組織関係＋製品カテゴリマスタ・循環防止・ドリルダウン, #7） /
+  ガバナンス・スチュワードシップ（品質・重複・滞留・必須未入力を横断集約した優先度付きワークキュー＋担当者別ワークロード, #10）.
 - ❌ **Not implemented (1):** 配信・連携.
 
 **Tracking:** the coverage matrix and roadmap live in **Epic #3**
@@ -557,7 +598,7 @@ clean-architecture layer map above):
 | P2 | #7  | 階層・関係管理（企業グループ／製品カテゴリ／顧客拠点） ✅ **done** | `hierarchy` |
 | P2 | #8  | 変更承認ワークフロー（maker-checker） ✅ **done** | `workflow` |
 | P2 | #9  | ロールベース認可・行レベルセキュリティ（@role/RLS） ✅ **done** (client-side) | `security` |
-| P2 | #10 | スチュワードシップ・ワークキュー | `governance` |
+| P2 | #10 | スチュワードシップ・ワークキュー ✅ **done** | `governance` |
 | P3 | #11 | データ品質ルール拡張（標準化・クレンジング・是正キュー） | `quality` |
 | P3 | #12 | 配信・連携（下流公開・Webhook/イベント・API） | `distribution` |
 | P3 | #13 | 分析強化（品質トレンド・時系列・レポート出力） | `analytics` |

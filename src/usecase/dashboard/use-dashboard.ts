@@ -3,8 +3,13 @@ import { useMemo } from 'react';
 import type { Customer } from '@/domain/models/customer';
 import type { Product } from '@/domain/models/product';
 import type { DuplicatePair } from '@/domain/models/duplicate';
+import type { StewardWorkload } from '@/domain/models/steward-task';
 import { findCustomerDuplicates } from '@/domain/policies/duplicate-policy';
 import { findProductDuplicates } from '@/domain/policies/duplicate-policy';
+import {
+  deriveStewardTasks,
+  stewardWorkloads,
+} from '@/domain/policies/steward-task-policy';
 
 import { useCustomers } from '@/usecase/customers/use-customers';
 import { useProducts } from '@/usecase/products/use-products';
@@ -26,6 +31,8 @@ export interface DashboardViewModel {
   recentProducts: Product[];
   customerDuplicates: DuplicatePair[];
   productDuplicates: DuplicatePair[];
+  /** Per-steward open-task load across both masters (Issue #10). */
+  stewardWorkloads: StewardWorkload[];
 }
 
 /** Aggregates both masters into the analytics view shown on the dashboard. */
@@ -60,6 +67,14 @@ export function useDashboard(): DashboardViewModel {
     [products.products]
   );
 
+  const stewardLoads = useMemo(
+    () =>
+      stewardWorkloads(
+        deriveStewardTasks(customers.customers, products.products)
+      ),
+    [customers.customers, products.products]
+  );
+
   return {
     loading: customers.loading || products.loading,
     error: customers.error ?? products.error,
@@ -69,5 +84,6 @@ export function useDashboard(): DashboardViewModel {
     recentProducts,
     customerDuplicates,
     productDuplicates,
+    stewardWorkloads: stewardLoads,
   };
 }
