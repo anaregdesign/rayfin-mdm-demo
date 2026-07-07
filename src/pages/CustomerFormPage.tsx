@@ -70,6 +70,7 @@ export function CustomerFormPage() {
         draft={vm.draft}
         errors={vm.errors}
         duplicateMatches={vm.duplicateMatches}
+        parentOptions={vm.parentOptions}
         saving={vm.saving}
         submitError={vm.submitError}
         isEdit={vm.isEdit}

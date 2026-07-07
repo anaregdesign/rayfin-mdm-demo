@@ -13,6 +13,7 @@ import { ROLE_VALUES } from '@/domain/models/authz';
 import { LoadingState } from '@/components/shared/LoadingState';
 import { AuthPage } from '@/pages/AuthPage';
 import { ApprovalPage } from '@/pages/ApprovalPage';
+import { CategoryManagementPage } from '@/pages/CategoryManagementPage';
 import { CustomerDetailPage } from '@/pages/CustomerDetailPage';
 import { CustomerFormPage } from '@/pages/CustomerFormPage';
 import { CustomerListPage } from '@/pages/CustomerListPage';
@@ -94,6 +95,7 @@ export default function App() {
           <Route path="/products/new" element={<ProductFormPage />} />
           <Route path="/products/:id" element={<ProductDetailPage />} />
           <Route path="/products/:id/edit" element={<ProductFormPage />} />
+          <Route path="/categories" element={<CategoryManagementPage />} />
           <Route path="/approvals" element={<ApprovalPage />} />
           <Route path="/guide" element={<GuidePage />} />
         </Route>

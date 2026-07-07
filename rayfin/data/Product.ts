@@ -52,6 +52,13 @@ export class Product {
   @text({ max: 120, optional: true }) brand?: string;
   @text({ max: 1000, optional: true }) description?: string;
 
+  /**
+   * Optional assignment to a node in the hierarchical `ProductCategory` master
+   * (Issue #7). Additive alongside the legacy flat `category` @set: stored as
+   * text (not a declared FK) since the app resolves the tree in memory.
+   */
+  @text({ max: 60, optional: true }) categoryId?: string;
+
   @decimal() unitPrice!: number;
 
   @set('JPY', 'USD', 'EUR')

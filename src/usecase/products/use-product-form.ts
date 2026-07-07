@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { categoryDisplayName } from '@/domain/models/category';
 import type { Product, ProductInput } from '@/domain/models/product';
 import { emptyProductInput, productToInput } from '@/domain/models/product';
 import type { DuplicatePair } from '@/domain/models/duplicate';
 import type { FieldErrors } from '@/domain/models/validation';
 import { findProductMatchesForInput } from '@/domain/policies/duplicate-policy';
+import { buildForest, flattenForest } from '@/domain/policies/hierarchy-policy';
 import {
   validateProductInput,
   type ProductField,
@@ -12,16 +14,26 @@ import {
 import { can } from '@/domain/policies/access-policy';
 import { useDependencies } from '@/di/dependencies';
 import { toMessage } from '@/lib/errors';
+import { useCategories } from '@/usecase/categories/use-categories';
 import type { SubmitOutcome } from '@/usecase/shared/submit-outcome';
 
 import { useProducts } from './use-products';
 import { useAuth } from '@/usecase/auth/use-auth';
+
+/** An indented category-master option for the product assignment picker. */
+export interface CategoryOption {
+  id: string;
+  label: string;
+  depth: number;
+}
 
 export interface ProductFormViewModel {
   draft: ProductInput;
   errors: FieldErrors<ProductField>;
   isValid: boolean;
   duplicateMatches: DuplicatePair[];
+  /** Category-master nodes (indented) for the optional hierarchy assignment. */
+  categoryOptions: CategoryOption[];
   loading: boolean;
   saving: boolean;
   submitError: string | null;
@@ -45,6 +57,7 @@ export interface ProductFormViewModel {
  */
 export function useProductForm(editId?: string): ProductFormViewModel {
   const store = useProducts();
+  const { categories } = useCategories();
   const { actor, requireApproval } = useAuth();
   const { changeRequests } = useDependencies();
   const [draft, setDraft] = useState<ProductInput>(emptyProductInput);
@@ -80,6 +93,16 @@ export function useProductForm(editId?: string): ProductFormViewModel {
   const duplicateMatches = useMemo(
     () => findProductMatchesForInput(draft, store.products, editId),
     [draft, store.products, editId]
+  );
+
+  const categoryOptions = useMemo<CategoryOption[]>(
+    () =>
+      flattenForest(buildForest(categories)).map(({ value, depth }) => ({
+        id: value.id,
+        label: `${'　'.repeat(depth)}${categoryDisplayName(value)}`,
+        depth,
+      })),
+    [categories]
   );
 
   const setField = useCallback(
@@ -139,6 +162,7 @@ export function useProductForm(editId?: string): ProductFormViewModel {
     errors,
     isValid: validation.valid,
     duplicateMatches,
+    categoryOptions,
     loading: store.loading && isEdit && !hydrated,
     saving,
     submitError,

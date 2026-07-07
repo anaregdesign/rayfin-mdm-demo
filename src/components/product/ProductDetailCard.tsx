@@ -14,12 +14,18 @@ import { formatDateTime } from '@/lib/format';
 interface ProductDetailCardProps {
   product: Product;
   quality: QualityResult;
+  /** Root→self breadcrumb of the assigned category master node, if any. */
+  categoryPath?: string | null;
 }
 
 const DASH = '—';
 
 /** 360° product view: attributes, pricing, quality breakdown, and audit trail. */
-export function ProductDetailCard({ product, quality }: ProductDetailCardProps) {
+export function ProductDetailCard({
+  product,
+  quality,
+  categoryPath,
+}: ProductDetailCardProps) {
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
       <div className="lg:col-span-2 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
@@ -34,6 +40,7 @@ export function ProductDetailCard({ product, quality }: ProductDetailCardProps) 
           <FieldRow label="カテゴリ">
             {productCategoryLabel(product.category)}
           </FieldRow>
+          <FieldRow label="カテゴリ階層">{categoryPath ?? DASH}</FieldRow>
           <FieldRow label="ブランド">{product.brand ?? DASH}</FieldRow>
           <FieldRow label="単価">
             {formatMoney(product.unitPrice, product.currency)}

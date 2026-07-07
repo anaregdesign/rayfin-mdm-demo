@@ -1,7 +1,12 @@
 import { useCallback, useMemo, useState } from 'react';
 
 import type { ChangeEntry } from '@/domain/models/change-log';
-import { customerToInput, type Customer, type CustomerInput } from '@/domain/models/customer';
+import {
+  customerRelationTypeLabel,
+  customerToInput,
+  type Customer,
+  type CustomerInput,
+} from '@/domain/models/customer';
 import type { CustomerStatus } from '@/domain/models/master-status';
 import type { DuplicatePair } from '@/domain/models/duplicate';
 import { isMergeActive, type MergeFieldSource } from '@/domain/models/merge';
@@ -11,6 +16,11 @@ import {
   pairsForId,
 } from '@/domain/policies/duplicate-policy';
 import { evaluateCustomerQuality } from '@/domain/policies/customer-quality-policy';
+import {
+  ancestorsOf,
+  childrenOf,
+  siblingsOf,
+} from '@/domain/policies/hierarchy-policy';
 import { revertChanges } from '@/domain/policies/diff-policy';
 import {
   allowedCustomerTransitions,
@@ -34,6 +44,20 @@ import { useMerge, type MergeGateways } from '@/usecase/merge/use-merge';
 
 import { useCustomers } from './use-customers';
 
+/** The org-hierarchy neighbourhood of a customer (Issue #7). */
+export interface CustomerRelations {
+  /** Immediate parent record, if the parentId resolves. */
+  parent: Customer | null;
+  /** Ancestor chain ordered root → nearest parent (breadcrumb order). */
+  ancestors: Customer[];
+  /** Direct children. */
+  children: Customer[];
+  /** Records that share the same parent. */
+  siblings: Customer[];
+  /** Localised relationship-type label (子会社 / 支店 …), if set. */
+  relationTypeLabel: string | null;
+}
+
 export interface CustomerDetailViewModel {
   loading: boolean;
   error: string | null;
@@ -42,6 +66,8 @@ export interface CustomerDetailViewModel {
   customer: Customer | null;
   quality: QualityResult | null;
   duplicatePairs: DuplicatePair[];
+  /** Parent / children / siblings neighbourhood for the relations panel. */
+  relations: CustomerRelations | null;
   allowedTransitions: CustomerStatus[];
   canEdit: boolean;
   canDelete: boolean;
@@ -92,6 +118,23 @@ export function useCustomerDetailPage(id: string): CustomerDetailViewModel {
   const duplicatePairs = useMemo(() => {
     if (!customer) return [];
     return pairsForId(findCustomerDuplicates(store.customers), customer.id);
+  }, [store.customers, customer]);
+
+  const relations = useMemo<CustomerRelations | null>(() => {
+    if (!customer) return null;
+    const parent = customer.parentId
+      ? store.customers.find((c) => c.id === customer.parentId) ?? null
+      : null;
+    return {
+      parent,
+      // ancestorsOf returns nearest→root; reverse for a root→nearest breadcrumb.
+      ancestors: [...ancestorsOf(store.customers, customer.id)].reverse(),
+      children: childrenOf(store.customers, customer.id),
+      siblings: siblingsOf(store.customers, customer.id),
+      relationTypeLabel: customer.relationType
+        ? customerRelationTypeLabel(customer.relationType)
+        : null,
+    };
   }, [store.customers, customer]);
 
   const allowedTransitions = customer
@@ -254,6 +297,7 @@ export function useCustomerDetailPage(id: string): CustomerDetailViewModel {
     customer,
     quality,
     duplicatePairs,
+    relations,
     allowedTransitions,
     canEdit,
     canDelete,

@@ -8,14 +8,20 @@ import type {
   CustomerSortKey,
   CustomerStatusFilter,
 } from '@/usecase/customers/selectors';
+import type { CustomerHierarchyOption } from '@/usecase/customers/use-customer-list-page';
 
 interface CustomerFiltersProps {
   search: string;
   status: CustomerStatusFilter;
   sort: CustomerSortKey;
+  /** Selected hierarchy rollup ancestor (empty = all). */
+  ancestor: string;
+  /** Indented customer tree for the rollup picker. */
+  hierarchyOptions: CustomerHierarchyOption[];
   onSearch: (value: string) => void;
   onStatusFilter: (value: CustomerStatusFilter) => void;
   onSort: (value: CustomerSortKey) => void;
+  onAncestor: (value: string) => void;
 }
 
 const SORT_OPTIONS: { value: CustomerSortKey; label: string }[] = [
@@ -33,17 +39,24 @@ const STATUS_OPTIONS = [
   })),
 ];
 
-/** Search + status + sort controls for the customer list. */
+/** Search + status + sort + hierarchy-rollup controls for the customer list. */
 export function CustomerFilters({
   search,
   status,
   sort,
+  ancestor,
+  hierarchyOptions,
   onSearch,
   onStatusFilter,
   onSort,
+  onAncestor,
 }: CustomerFiltersProps) {
+  const ancestorOptions = [
+    { value: '', label: 'すべての階層' },
+    ...hierarchyOptions.map((o) => ({ value: o.id, label: o.label })),
+  ];
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <SearchInput
         value={search}
         onChange={onSearch}
@@ -55,6 +68,12 @@ export function CustomerFilters({
         value={status}
         options={STATUS_OPTIONS}
         onChange={(v) => onStatusFilter(v as CustomerStatusFilter)}
+      />
+      <SelectField
+        label=""
+        value={ancestor}
+        options={ancestorOptions}
+        onChange={onAncestor}
       />
       <SelectField
         label=""

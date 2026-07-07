@@ -23,6 +23,7 @@ import {
 } from '@/domain/models/product';
 import type { FieldErrors } from '@/domain/models/validation';
 import type { ProductField } from '@/domain/policies/product-validation';
+import type { CategoryOption } from '@/usecase/products/use-product-form';
 import {
   CURRENCY_LABELS,
   CURRENCY_VALUES,
@@ -33,6 +34,8 @@ interface ProductFormProps {
   draft: ProductInput;
   errors: FieldErrors<ProductField>;
   duplicateMatches: DuplicatePair[];
+  /** Category-master nodes (indented) for the optional hierarchy assignment. */
+  categoryOptions: CategoryOption[];
   saving: boolean;
   submitError: string | null;
   isEdit: boolean;
@@ -68,6 +71,7 @@ export function ProductForm({
   draft,
   errors,
   duplicateMatches,
+  categoryOptions,
   saving,
   submitError,
   isEdit,
@@ -76,6 +80,10 @@ export function ProductForm({
   onSubmit,
   onCancel,
 }: ProductFormProps) {
+  const categorySelectOptions = [
+    { value: '', label: '（未割り当て）' },
+    ...categoryOptions.map((o) => ({ value: o.id, label: o.label })),
+  ];
   return (
     <form
       onSubmit={(e) => {
@@ -112,6 +120,15 @@ export function ProductForm({
             value={draft.category}
             options={CATEGORY_OPTIONS}
             onChange={(v) => onField('category', v as ProductCategory)}
+          />
+          <SelectField
+            label="カテゴリ階層（マスタ）"
+            value={draft.categoryId ?? ''}
+            options={categorySelectOptions}
+            onChange={(v) =>
+              onField('categoryId', v === '' ? undefined : v)
+            }
+            hint="カテゴリマスタの階層ノードに割り当てます（任意）"
           />
           <TextField
             label="ブランド"

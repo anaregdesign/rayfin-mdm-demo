@@ -6,6 +6,7 @@ import {
   findCustomerDuplicates,
 } from '@/domain/policies/duplicate-policy';
 import { evaluateCustomerQuality } from '@/domain/policies/customer-quality-policy';
+import { subtreeIds } from '@/domain/policies/hierarchy-policy';
 import type { QualityResult } from '@/domain/models/quality';
 import { includesNormalized } from '@/lib/text';
 
@@ -16,12 +17,18 @@ export interface CustomerListFilters {
   search: string;
   status: CustomerStatusFilter;
   sort: CustomerSortKey;
+  /**
+   * Hierarchy rollup: when set, the list is restricted to this customer and
+   * everything beneath it in the org tree (Issue #7). Empty = no restriction.
+   */
+  ancestorId: string;
 }
 
 export const DEFAULT_CUSTOMER_FILTERS: CustomerListFilters = {
   search: '',
   status: 'all',
   sort: 'updated',
+  ancestorId: '',
 };
 
 /** Row view-model: the record plus its derived quality and duplicate flag. */
@@ -80,9 +87,16 @@ export function buildCustomerListView(
   const duplicatePairs = findCustomerDuplicates(customers);
   const dupIds = duplicateIdSet(duplicatePairs);
 
+  // Hierarchy rollup: restrict to the chosen ancestor + all descendants.
+  const inScope =
+    filters.ancestorId.length > 0
+      ? subtreeIds(customers, filters.ancestorId)
+      : null;
+
   const items = customers
     .filter(
       (c) =>
+        (inScope === null || inScope.has(c.id)) &&
         matchesSearch(c, filters.search) &&
         (filters.status === 'all' || c.status === filters.status)
     )
