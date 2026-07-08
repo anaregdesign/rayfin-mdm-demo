@@ -117,7 +117,9 @@ To add a screen/tab: create a render-only component under
 `src/components/<feature>/`, a thin container `src/pages/<Feature>Page.tsx`
 (one VM hook, or none for static content), register a declarative `<Route>` in
 `src/App.tsx`, and add the `NAV_ITEMS` entry in
-`src/components/layout/AppShell.tsx`. Keep all labels/copy in Japanese.
+`src/components/layout/AppShell.tsx`. `AppShell` renders a **fixed left sidebar**
+(logo → vertical `NAV_ITEMS` nav → footer with `controls` slot + user + サインアウト)
+next to the scrolling `max-w-6xl` content area. Keep all labels/copy in Japanese.
 
 ### Change history & audit (Issue #5)
 
@@ -294,7 +296,7 @@ and a header **role switcher** lets you demo each role live.
   `highestRole(grantedRoles)`, resets on sign-in/out) and derives the `actor`;
   `use-auth.ts` exposes `grantedRoles`/`activeRole`/`setActiveRole`/`actor`. The
   demo `components/auth/RoleSwitcher.tsx` (render-only) offers **all** roles so an
-  admin can preview viewer/steward, wired into `AppShell` via its `headerExtra`
+  admin can preview viewer/steward, wired into `AppShell` via its `controls`
   slot from `App.tsx`.
 - **Gating is computed in the VM, applied in the page.** Detail/list VMs call
   `useAuth()` for the `actor` and expose booleans (`canEdit`/`canDelete`/
@@ -323,8 +325,8 @@ reviews and, on approval, the payload is applied to the target master.
   CD smoke test must keep working with direct writes. `requireApproval` is an
   **app-layer flag owned by `AuthContext`** (like `activeRole`), exposed via
   `use-auth.ts` (`requireApproval`/`setRequireApproval`) and flipped from the
-  `components/approval/ApprovalModeToggle.tsx` header switch (render-only, wired
-  through `AppShell.headerExtra`). Off by default ⇒ existing flows unchanged.
+  `components/approval/ApprovalModeToggle.tsx` switch (render-only, wired
+  through `AppShell.controls`). Off by default ⇒ existing flows unchanged.
 - **The request is a first-class entity.** `rayfin/data/ChangeRequest.ts`
   (`@authenticated('*')`, registered in `schema.ts`) stores entityType/entityId/
   operation/`payload` (proposed `CustomerInput`/`ProductInput` as JSON, max 8000)/

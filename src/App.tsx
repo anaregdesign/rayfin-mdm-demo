@@ -63,7 +63,7 @@ function ProtectedLayout() {
       onSignOut={() => {
         void signOut();
       }}
-      headerExtra={
+      controls={
         <>
           <ApprovalModeToggle
             enabled={requireApproval}
