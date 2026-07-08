@@ -7,22 +7,59 @@ interface GlossaryTerm {
   description: string;
 }
 
-interface Capability {
+interface Feature {
   tab: string;
-  title: string;
-  description: string;
+  to: string;
+  summary: string;
 }
 
 interface WorkflowStep {
   title: string;
   detail: string;
+  note?: string;
   links: { to: string; label: string }[];
 }
 
-const WHY_MDM: string[] = [
-  '部門やシステムごとに顧客・製品データが分散し、表記ゆれや重複が発生する。',
-  'どのレコードが正しいのか判断できず、集計・分析・請求の精度が下がる。',
-  '責任者（データスチュワード）や更新履歴が曖昧で、ガバナンスが効かない。',
+interface RoleRow {
+  label: string;
+  reading: string;
+  can: string;
+}
+
+interface QuickLink {
+  to: string;
+  label: string;
+  description: string;
+}
+
+const RISKS: string[] = [
+  '部門やシステムごとに顧客・製品データが分散し、表記ゆれ・重複・欠損が生まれる。',
+  'どのレコードが正しいのか判断できず、集計・分析・請求・出荷の精度が落ちる。',
+  '同じ顧客を別々に扱ってしまい、与信・コンプライアンス・顧客体験のリスクが高まる。',
+  '責任者（データスチュワード）や変更履歴が曖昧で、ガバナンスと監査が効かない。',
+];
+
+const BENEFITS: { title: string; detail: string }[] = [
+  {
+    title: '単一の情報源',
+    detail:
+      '全部門・全システムが同じ正しいマスタを参照でき、意思決定が速く正確になる。',
+  },
+  {
+    title: '品質の可視化と是正',
+    detail:
+      '欠損・表記ゆれ・重複を数値で把握し、継続的に改善するサイクルを回せる。',
+  },
+  {
+    title: 'ガバナンスと監査',
+    detail:
+      '誰が・いつ・何を変えたかを記録し、承認フローで統制を効かせられる。',
+  },
+  {
+    title: '下流連携の自動化',
+    detail:
+      'マスタの変更を配信イベントとして下流システムへ確実に届けられる。',
+  },
 ];
 
 const GLOSSARY: GlossaryTerm[] = [
@@ -61,38 +98,68 @@ const GLOSSARY: GlossaryTerm[] = [
     description:
       'レコードの状態遷移（下書き→有効→無効→アーカイブ）。運用ルールに沿って管理する。',
   },
+  {
+    term: '承認フロー',
+    reading: 'Maker-Checker',
+    description:
+      '申請者（メーカー）の変更を、別の承認者（チェッカー）が確認して初めて反映する統制方式。',
+  },
+  {
+    term: '配信 / アウトボックス',
+    reading: 'Distribution / Outbox',
+    description:
+      'マスタの変更を配信イベントとして蓄積し、下流システムへ順番に連携する仕組み。',
+  },
 ];
 
-const CAPABILITIES: Capability[] = [
+const FEATURES: Feature[] = [
   {
     tab: 'ダッシュボード',
-    title: '分析・可視化',
-    description:
-      '両マスタの件数、データ品質分布、ステータス内訳、重複候補、最近の更新を一目で把握。',
+    to: '/',
+    summary:
+      '件数・品質分布・ステータス内訳・品質トレンド・構成分析・重複候補・是正状況を一望。低品質カードからドリルダウンでき、CSV／印刷レポートも出力できます。',
   },
   {
-    tab: '顧客マスタ / 製品マスタ',
-    title: 'データモデル & 登録',
-    description:
-      '顧客・製品エンティティの一覧・検索・並び替え、新規登録および編集をフォームから実施。',
+    tab: '顧客マスタ',
+    to: '/customers',
+    summary:
+      '顧客の一覧・検索・並び替え・フィルタ、新規登録／編集、CSVエクスポートと一括インポート、360°の詳細ビュー。',
   },
   {
-    tab: '各レコード詳細',
-    title: 'データ品質',
-    description:
-      '必須項目の検証と、レコードごとの完全性スコア（品質スコア）を自動算出して表示。',
+    tab: '製品マスタ',
+    to: '/products',
+    summary:
+      '製品の一覧・検索・登録／編集に加え、カテゴリ・価格・単位などを管理。顧客マスタと同様にCSVで入出力できます。',
   },
   {
-    tab: 'ダッシュボード / 一覧',
-    title: '名寄せ・重複検出',
-    description:
-      '名称・コード・メールを正規化して重複候補ペアを検出し、統合の判断を支援。',
+    tab: 'カテゴリ管理',
+    to: '/categories',
+    summary:
+      '製品マスタが参照するカテゴリ階層を管理。階層はダッシュボードのドリルダウン集計や一覧の絞り込みに使われます。',
   },
   {
-    tab: '各レコード詳細',
-    title: 'ガバナンス & 監査',
-    description:
-      'ステータス、担当スチュワード、作成者・更新者・作成日時・更新日時を記録・追跡。',
+    tab: 'ワークキュー',
+    to: '/workqueue',
+    summary:
+      'スチュワードが対応すべきレコードを、検出理由（品質・重複・下書き滞留・必須未入力）と優先度つきで一覧。編集・統合へワンクリックで遷移します。',
+  },
+  {
+    tab: '是正キュー',
+    to: '/remediation',
+    summary:
+      '表記ゆれの標準化候補、品質スコアの低いレコード、必須項目が未入力のレコードを一覧。標準化候補はワンクリックで適用できます。',
+  },
+  {
+    tab: '配信・連携',
+    to: '/distribution',
+    summary:
+      'マスタの変更を配信イベント（アウトボックス）として記録し、下流システムへ連携。イベントの確認・手動配信、有効レコードのCSV/JSONエクスポート、Webhook配信先の設定ができます。',
+  },
+  {
+    tab: '承認',
+    to: '/approvals',
+    summary:
+      'マスタの登録・編集の申請を確認し、承認または却下します（メーカーチェッカー）。',
   },
 ];
 
@@ -100,13 +167,13 @@ const WORKFLOWS: WorkflowStep[] = [
   {
     title: '① 全体像を掴む',
     detail:
-      'まず「ダッシュボード」で件数・品質・重複の状況を確認し、対応が必要な領域を把握します。',
+      'まず「ダッシュボード」で件数・品質・重複・是正の状況を確認し、対応が必要な領域を把握します。',
     links: [{ to: '/', label: 'ダッシュボードを開く' }],
   },
   {
-    title: '② マスタを探す',
+    title: '② マスタを探す・見る',
     detail:
-      '「顧客マスタ」または「製品マスタ」を開き、検索・フィルタ・並び替えで対象レコードを絞り込みます。',
+      '「顧客マスタ」または「製品マスタ」で検索・フィルタ・並び替えを使い、対象レコードを絞り込んで詳細を確認します。',
     links: [
       { to: '/customers', label: '顧客マスタを開く' },
       { to: '/products', label: '製品マスタを開く' },
@@ -115,66 +182,81 @@ const WORKFLOWS: WorkflowStep[] = [
   {
     title: '③ 登録・編集する',
     detail:
-      '「新規登録」ボタンから追加、または詳細画面の「編集」から更新します。必須項目はその場で検証されます。',
+      '「新規登録」から追加、または詳細画面の「編集」から更新します。必須項目はその場で検証されます。',
+    note: '承認フロー（デモ）を有効にしている場合、保存は直接反映されず「承認」タブへの申請になります。',
     links: [
       { to: '/customers/new', label: '顧客を新規登録' },
       { to: '/products/new', label: '製品を新規登録' },
     ],
   },
   {
-    title: '④ 品質を確認する',
+    title: '④ まとめて取り込む',
     detail:
-      '詳細画面で品質スコアと不足項目を確認し、完全性を高めます。スコアは入力の充足度に応じて自動更新されます。',
+      '既存データはCSVで一括インポートできます。一覧画面の取込から、既存キーの扱い（スキップ／更新）を選んで登録します。',
     links: [
-      { to: '/customers', label: '顧客一覧から確認' },
-      { to: '/products', label: '製品一覧から確認' },
+      { to: '/customers', label: '顧客をCSV取込' },
+      { to: '/products', label: '製品をCSV取込' },
     ],
   },
   {
-    title: '⑤ 重複を統合する',
+    title: '⑤ 品質を確認・是正する',
     detail:
-      '重複候補パネルで同一実体と思われるペアを確認し、正しいゴールデンレコードへ統合・整理します。',
-    links: [{ to: '/', label: 'ダッシュボードで重複候補を見る' }],
+      '詳細画面の品質スコアで不足項目を確認し、補完します。「是正キュー」では表記ゆれの標準化候補をワンクリックで適用できます。',
+    links: [
+      { to: '/remediation', label: '是正キューを開く' },
+      { to: '/customers', label: '顧客の品質を確認' },
+    ],
   },
   {
-    title: '⑥ ライフサイクルを管理する',
+    title: '⑥ 重複を名寄せする',
     detail:
-      '運用状況に合わせてステータス（下書き→有効→無効→アーカイブ）と担当スチュワードを更新します。',
+      'ダッシュボードやワークキューの重複候補から、同一実体と思われるペアを確認し、正しいゴールデンレコードへ統合します。',
     links: [
-      { to: '/customers', label: '顧客マスタへ' },
-      { to: '/products', label: '製品マスタへ' },
+      { to: '/', label: 'ダッシュボードで重複候補を見る' },
+      { to: '/workqueue', label: 'ワークキューを開く' },
     ],
+  },
+  {
+    title: '⑦ 承認する',
+    detail:
+      '承認フローが有効なとき、申請された登録・編集を「承認」タブで確認し、承認または却下します。',
+    links: [{ to: '/approvals', label: '承認タブを開く' }],
+  },
+  {
+    title: '⑧ 下流へ配信する',
+    detail:
+      '確定したマスタの変更を「配信・連携」で下流システムへ届けます。配信イベントの確認・手動配信やCSV/JSONエクスポートができます。',
+    links: [{ to: '/distribution', label: '配信・連携を開く' }],
   },
 ];
 
-interface QuickLink {
-  to: string;
-  label: string;
-  description: string;
-}
+const ROLES: RoleRow[] = [
+  {
+    label: '閲覧者',
+    reading: 'viewer',
+    can: '閲覧のみ。機微項目は非表示になります。',
+  },
+  {
+    label: 'データスチュワード',
+    reading: 'steward',
+    can: '担当レコードの編集・統合・状態変更に加え、新規登録・CSV取込ができます。',
+  },
+  {
+    label: '管理者',
+    reading: 'admin',
+    can: '承認・削除を含むすべての操作ができます。',
+  },
+];
 
 const QUICK_LINKS: QuickLink[] = [
-  { to: '/', label: 'ダッシュボード', description: '品質・重複・件数の全体像' },
-  {
-    to: '/customers',
-    label: '顧客マスタ一覧',
-    description: '顧客レコードの検索・確認',
-  },
-  {
-    to: '/products',
-    label: '製品マスタ一覧',
-    description: '製品レコードの検索・確認',
-  },
-  {
-    to: '/customers/new',
-    label: '顧客を新規登録',
-    description: '新しい顧客を追加',
-  },
-  {
-    to: '/products/new',
-    label: '製品を新規登録',
-    description: '新しい製品を追加',
-  },
+  { to: '/', label: 'ダッシュボード', description: '品質・重複・件数・トレンドの全体像' },
+  { to: '/customers', label: '顧客マスタ', description: '顧客レコードの検索・登録・取込' },
+  { to: '/products', label: '製品マスタ', description: '製品レコードの検索・登録・取込' },
+  { to: '/categories', label: 'カテゴリ管理', description: '製品カテゴリ階層の管理' },
+  { to: '/workqueue', label: 'ワークキュー', description: '対応すべきレコードの一覧' },
+  { to: '/remediation', label: '是正キュー', description: '標準化・低品質・未入力の是正' },
+  { to: '/distribution', label: '配信・連携', description: '下流連携とエクスポート' },
+  { to: '/approvals', label: '承認', description: '登録・編集申請の承認／却下' },
 ];
 
 const QUALITY_LEVELS: { label: string; color: string; note: string }[] = [
@@ -231,8 +313,9 @@ function GuideLink({ to, label }: { to: string; label: string }) {
 }
 
 /**
- * Static explanatory guide (presentational only). Introduces MDM concepts and
- * documents how to operate this PoC. Holds no state and calls no ports.
+ * Static explanatory guide (presentational only). Introduces MDM concepts, maps
+ * every sidebar tab to what it does, and walks through the basic workflow.
+ * Holds no state and calls no ports.
  */
 export function GuideContent() {
   return (
@@ -250,22 +333,58 @@ export function GuideContent() {
             として維持する取り組みです。分散・重複したデータを名寄せして
             <span className="font-medium text-slate-900">ゴールデンレコード</span>
             を作り、品質・ガバナンス・ライフサイクルを継続的に管理します。
+            このアプリは、そのMDMの一連の流れを小さく体験できるPoCです。
           </p>
         </div>
       </Section>
 
-      <Section title="なぜMDMが必要か" description="典型的な課題">
-        <ul className="space-y-2">
-          {WHY_MDM.map((item) => (
-            <li
-              key={item}
-              className="flex items-start gap-3 rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600"
-            >
-              <span className="mt-0.5 text-rose-500">●</span>
-              <span>{item}</span>
-            </li>
-          ))}
-        </ul>
+      <Section
+        title="なぜMDMが大切か"
+        description="マスタの乱れが招くリスクと、MDMがもたらす価値"
+      >
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="rounded-lg border border-rose-200 bg-rose-50/40 p-5">
+            <h3 className="text-sm font-semibold text-rose-800">
+              マスタが乱れると起きること
+            </h3>
+            <ul className="mt-3 space-y-2">
+              {RISKS.map((item) => (
+                <li
+                  key={item}
+                  className="flex items-start gap-2 text-sm text-slate-600"
+                >
+                  <span className="mt-0.5 text-rose-500" aria-hidden>
+                    ●
+                  </span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50/40 p-5">
+            <h3 className="text-sm font-semibold text-emerald-800">
+              MDMがもたらす価値
+            </h3>
+            <ul className="mt-3 space-y-3">
+              {BENEFITS.map((b) => (
+                <li key={b.title} className="text-sm text-slate-600">
+                  <span className="flex items-start gap-2">
+                    <span className="mt-0.5 text-emerald-600" aria-hidden>
+                      ✓
+                    </span>
+                    <span>
+                      <span className="font-medium text-slate-900">
+                        {b.title}
+                      </span>
+                      <span className="text-slate-400">｜</span>
+                      {b.detail}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
       </Section>
 
       <Section title="主要な用語" description="MDMの基本概念">
@@ -289,28 +408,32 @@ export function GuideContent() {
         </div>
       </Section>
 
-      <Section title="このアプリでできること" description="PoCが提供するMDM機能">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {CAPABILITIES.map((c) => (
+      <Section
+        title="このアプリの全体像"
+        description="左のメニュー（タブ）ごとの役割。名前をクリックすると開けます"
+      >
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {FEATURES.map((f) => (
             <div
-              key={c.title}
+              key={f.tab}
               className="flex flex-col rounded-lg border border-slate-200 bg-white p-4"
             >
-              <span className="w-fit rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700">
-                {c.tab}
-              </span>
-              <h3 className="mt-3 text-sm font-semibold text-slate-900">
-                {c.title}
-              </h3>
-              <p className="mt-1 text-sm leading-relaxed text-slate-600">
-                {c.description}
+              <Link
+                to={f.to}
+                className="w-fit text-sm font-semibold text-indigo-700 hover:underline"
+              >
+                {f.tab}
+                <span aria-hidden> →</span>
+              </Link>
+              <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
+                {f.summary}
               </p>
             </div>
           ))}
         </div>
       </Section>
 
-      <Section title="使い方ガイド" description="基本的な運用フロー">
+      <Section title="はじめての操作（クイックスタート）" description="基本的な運用フロー">
         <ol className="space-y-3">
           {WORKFLOWS.map((step) => (
             <li
@@ -323,6 +446,11 @@ export function GuideContent() {
               <p className="mt-1 text-sm leading-relaxed text-slate-600">
                 {step.detail}
               </p>
+              {step.note && (
+                <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800">
+                  {step.note}
+                </p>
+              )}
               <div className="mt-3 flex flex-wrap gap-2">
                 {step.links.map((link) => (
                   <GuideLink
@@ -335,6 +463,47 @@ export function GuideContent() {
             </li>
           ))}
         </ol>
+      </Section>
+
+      <Section
+        title="ロールと承認フロー"
+        description="操作できる範囲は、ロールと承認モードで変わります"
+      >
+        <div className="space-y-4">
+          <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+            {ROLES.map((r, i) => (
+              <div
+                key={r.reading}
+                className={`flex flex-col gap-1 p-4 sm:flex-row sm:items-center sm:gap-4 ${
+                  i > 0 ? 'border-t border-slate-100' : ''
+                }`}
+              >
+                <div className="flex w-full items-baseline gap-2 sm:w-52 sm:shrink-0">
+                  <span className="text-sm font-semibold text-slate-900">
+                    {r.label}
+                  </span>
+                  <span className="text-xs text-slate-400">{r.reading}</span>
+                </div>
+                <span className="text-sm text-slate-600">{r.can}</span>
+              </div>
+            ))}
+          </div>
+          <p className="rounded-lg border border-slate-200 bg-white p-4 text-sm leading-relaxed text-slate-600">
+            <span className="font-medium text-slate-900">
+              サイドバー下部のスイッチ（デモ用）
+            </span>
+            で、ロールの切り替えと
+            <span className="font-medium text-slate-900">承認フロー</span>
+            のオン／オフを試せます。承認フローを有効にすると、登録・編集は直接保存されず
+            <Link
+              to="/approvals"
+              className="text-indigo-700 underline decoration-dotted hover:text-indigo-900"
+            >
+              「承認」タブ
+            </Link>
+            への申請となり、承認されて初めて反映されます。
+          </p>
+        </div>
       </Section>
 
       <Section title="データ品質スコアの見方" description="レコードの完全性を色で表現">

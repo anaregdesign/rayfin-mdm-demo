@@ -58,10 +58,16 @@ capabilities:
 - **Versioning / audit** — createdAt/updatedAt + createdBy/updatedBy.
 - **Analytics** — dashboard with counts, status breakdown, quality distribution,
   and duplicate highlights.
-- **In-app guide** — an **MDMガイド** tab explaining MDM concepts (用語・課題) and
-  how to operate the app (static, presentational; no state/ports). Each usage step
-  and a「主要ページへのショートカット」section link straight to the relevant routes
-  (dashboard / list / new) so readers can jump into the app from the guide.
+- **In-app guide** — an **MDMガイド** tab (top of the sidebar) that explains why MDM
+  matters (課題→価値), the core 用語, an **app overview mapping every sidebar tab** to
+  its role, an 8-step quickstart (探す→登録→CSV取込→品質是正→名寄せ→承認→配信), a
+  **ロールと承認フロー** section (viewer/steward/admin + the demo approval toggle), and
+  the quality-score legend. Static & presentational (no state/ports); every step,
+  feature card, and the「主要ページへのショートカット」grid deep-link straight to the
+  relevant routes (`/`, `/customers[/new]`, `/products[/new]`, `/categories`,
+  `/workqueue`, `/remediation`, `/distribution`, `/approvals`) so readers can jump
+  into the app from the guide. **Keep the guide in sync whenever tabs/features
+  change** — it is the single onboarding surface (`components/guide/GuideContent.tsx`).
 
 **All UI text is Japanese.** Keep new labels, messages, and empty/error states in Japanese.
 
