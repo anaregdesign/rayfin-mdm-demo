@@ -31,6 +31,12 @@ export interface AppDependencies {
   clock: Clock;
   /** True when the auth service requires Fabric interactive sign-in. */
   fabricAuthEnabled: boolean;
+  /**
+   * True when running the fully client-side demo (in-memory seeded data + auto
+   * demo user, no backend). The app shell uses this to hide the sign-out
+   * control since there is no real session to end.
+   */
+  anonymousDemo: boolean;
 }
 
 const DependenciesContext = createContext<AppDependencies | null>(null);

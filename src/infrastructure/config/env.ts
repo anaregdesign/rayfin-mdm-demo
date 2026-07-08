@@ -16,9 +16,28 @@ export interface AppConfig {
   apiBaseUrl: string;
   publishableKey: string;
   localDev: boolean;
+  /**
+   * When true, the app runs fully client-side against in-memory seeded data
+   * with an auto demo user — NO backend, NO sign-in. Defaults ON so the public
+   * demo opens straight into the data; set VITE_DEMO_MODE=false to use the real
+   * Fabric backend + SSO. See AGENTS.md「Anonymous / demo mode」.
+   */
+  demoMode: boolean;
   fabric: FabricConfig | null;
   /** Power BI report embedding config (all fields optional; unset = no report). */
   reportEmbed: ReportEmbedSettings;
+}
+
+/**
+ * Read the demo-mode flag. Defaults ON (true); only an explicit falsy string
+ * (`false`/`0`/`off`/`no`) turns it off, so a plain production build stays a
+ * no-login demo unless deliberately switched to real auth.
+ */
+function readDemoMode(): boolean {
+  const raw = import.meta.env.VITE_DEMO_MODE;
+  if (typeof raw !== 'string') return true;
+  const v = raw.trim().toLowerCase();
+  return !(v === 'false' || v === '0' || v === 'off' || v === 'no');
 }
 
 /**
@@ -56,11 +75,12 @@ function isLocalBackendUrl(url: string): boolean {
 export function readAppConfig(): AppConfig {
   const apiUrl = import.meta.env.VITE_RAYFIN_API_URL || 'http://localhost:5168';
   const localDev = isLocalBackendUrl(apiUrl);
+  const demoMode = readDemoMode();
   const publishableKey = import.meta.env.VITE_RAYFIN_PUBLISHABLE_KEY as
     | string
     | undefined;
 
-  if (!publishableKey && !localDev) {
+  if (!publishableKey && !localDev && !demoMode) {
     throw new Error(
       'VITE_RAYFIN_PUBLISHABLE_KEY environment variable is required'
     );
@@ -69,7 +89,7 @@ export function readAppConfig(): AppConfig {
   const apiBaseUrl = apiUrl.endsWith('/') ? apiUrl : `${apiUrl}/`;
 
   let fabric: FabricConfig | null = null;
-  if (!localDev) {
+  if (!localDev && !demoMode) {
     const workspaceId = import.meta.env.VITE_FABRIC_WORKSPACE_ID as
       | string
       | undefined;
@@ -90,6 +110,7 @@ export function readAppConfig(): AppConfig {
     apiBaseUrl,
     publishableKey: publishableKey ?? 'local-dev-key',
     localDev,
+    demoMode,
     fabric,
     reportEmbed: readReportEmbedSettings(),
   };
