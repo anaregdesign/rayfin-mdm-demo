@@ -15,6 +15,7 @@ import { RayfinOutboxEventRepository } from '@/infrastructure/data/rayfin-outbox
 import { RayfinProductRepository } from '@/infrastructure/data/rayfin-product-repository';
 import { LoggingHttpClient } from '@/infrastructure/http/logging-http-client';
 import { createRayfinClient } from '@/infrastructure/rayfin/client';
+import { ConfigReportEmbedProvider } from '@/infrastructure/reporting/config-report-embed-provider';
 
 import { readAppConfig, type AppConfig } from './env';
 
@@ -58,6 +59,10 @@ export function createAppDependencies(
   // `FetchHttpClient` to enable real webhook delivery in production.
   const httpClient = new LoggingHttpClient();
 
+  // Power BI report embedding config (secure-embed by default). Reads
+  // build-time `VITE_POWERBI_*` config; returns null until a report is set.
+  const reportEmbed = new ConfigReportEmbedProvider(config.reportEmbed);
+
   // Wrap the base repositories so every mutation records change history AND
   // emits a distribution (outbox) event, transparently to the use-case layer
   // (all three share the domain port). Distribution wraps OUTSIDE the audit
@@ -91,6 +96,7 @@ export function createAppDependencies(
     changeRequests,
     outbox,
     httpClient,
+    reportEmbed,
     clock,
     fabricAuthEnabled: auth.fabricAuthEnabled,
   };

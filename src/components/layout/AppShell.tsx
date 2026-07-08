@@ -12,6 +12,7 @@ interface AppShellProps {
 const NAV_ITEMS = [
   { to: '/guide', label: 'MDMガイド', end: false },
   { to: '/', label: 'ダッシュボード', end: true },
+  { to: '/report', label: 'BIレポート', end: false },
   { to: '/customers', label: '顧客マスタ', end: false },
   { to: '/products', label: '製品マスタ', end: false },
   { to: '/categories', label: 'カテゴリ管理', end: false },

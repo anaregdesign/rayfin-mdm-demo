@@ -667,6 +667,73 @@ documented as the honest PoC limitation.)
   `components/analytics/` (`QualityTrendChart` dependency-free SVG, `BreakdownTable`,
   `ReportExportButton`) are all render-only.
 
+### Power BI report embedding (BIレポート tab)
+
+The **BIレポート** tab embeds a *genuine* Power BI report over the MDM data using
+the official `powerbi-client-react` library — it does **not** hand-roll chart
+visuals (a `recharts`/SVG "Power BI-style" dashboard was explicitly rejected).
+When no report is configured it shows a professional setup card, never a fake
+chart.
+
+- **Clean-arch seam (config → port → adapter → hook → component → page):**
+  - Domain: `domain/models/report-embed.ts` — a discriminated union
+    `ReportEmbedConfig = TokenEmbedConfig(kind:'token') | SecureEmbedConfig(kind:'secure')`
+    plus the pure `buildSecureEmbedUrl()` (imports nothing outward, unit-tested).
+    `domain/ports/report-embed-provider.ts` — `ReportEmbedProvider.getReportEmbed(): ReportEmbedConfig | null`.
+  - Infra: `infrastructure/reporting/config-report-embed-provider.ts` —
+    `ReportEmbedSettings` (all optional) + `ConfigReportEmbedProvider`, which
+    picks a mode from whatever config is present (token when embedUrl+accessToken;
+    explicit `secureEmbedUrl`; else build a secure URL from ids; else `null`).
+    Pure + synchronous → unit-tested without a DOM.
+  - Config: `infrastructure/config/env.ts` reads `VITE_POWERBI_*` into
+    `AppConfig.reportEmbed` via throw-free `readReportEmbedSettings()`
+    (workspace/tenant fall back to `VITE_FABRIC_*`). This is the ONLY module that
+    touches `import.meta.env`; keep it throw-free so the CI pure-build gate stays
+    green when vars are absent.
+  - DI: `AppDependencies.reportEmbed: ReportEmbedProvider`, built in the
+    composition root `create-dependencies.ts` from `config.reportEmbed`.
+  - Usecase: `usecase/report/use-report-embed.ts` (`.ts`, no JSX) — thin
+    `useMemo` over the port; returns `{ config, ready }`.
+  - Component: `components/report/PowerBIReport.tsx` — the ONLY place that imports
+    `powerbi-client` / `powerbi-client-react` (a separate package from
+    `@microsoft/rayfin`, so it doesn't trip the SDK-location grep). Token →
+    `<PowerBIEmbed>` (`models.TokenType.Aad|Embed` from `powerbi-client`); secure →
+    a token-less `<iframe>`; `null` → JP setup card. Takes config via props (never
+    imports `@/infrastructure`).
+  - Page/route/nav: thin `pages/ReportPage.tsx`; route `/report` in `App.tsx`;
+    `NAV_ITEMS` entry「BIレポート」right after ダッシュボード in `AppShell.tsx`.
+- **Two modes.** `secure` (autoAuth SSO) is the default live path: a token-less
+  `https://app.powerbi.com/reportEmbed?reportId=&groupId=&autoAuth=true[&ctid=]`
+  URL that authenticates the *viewer* (the same Entra user who can already see the
+  workspace) directly in the iframe — no token handling. `token`
+  (App/User-Owns-Data) is an advanced path needing a server-minted AAD/Embed
+  token. **There is no in-browser Power BI AAD token** available from Rayfin/Fabric
+  auth (`client.auth.getSession()` is scoped to the Rayfin API), which is why
+  secure-embed is preferred.
+- **Env vars (all optional; unset ⇒ setup card):** `VITE_POWERBI_REPORT_ID`
+  (only one strictly needed for a secure embed), `VITE_POWERBI_WORKSPACE_ID` /
+  `VITE_POWERBI_TENANT_ID` (fall back to `VITE_FABRIC_*`),
+  `VITE_POWERBI_SECURE_EMBED_URL` (explicit override), and for token mode
+  `VITE_POWERBI_EMBED_URL` / `VITE_POWERBI_ACCESS_TOKEN` / `VITE_POWERBI_TOKEN_TYPE`.
+- **Deploy injection.** `rayfin env` only maps *known* Rayfin/Fabric keys, so
+  `VITE_POWERBI_*` are plain Vite vars read from the process env at build time.
+  `deploy.yml` has a **Configure Power BI embedding** step that exports the repo
+  variables `POWERBI_REPORT_ID` / `POWERBI_WORKSPACE_ID` / `POWERBI_TENANT_ID` /
+  `POWERBI_SECURE_EMBED_URL` into `$GITHUB_ENV` **before** `rayfin up` runs its
+  internal `vite build`, baking them into the deployed bundle. An access token, if
+  ever used, must be a GitHub **secret**, not a variable.
+- **Connecting a real report (one-variable step).** The demo workspace currently
+  has 0 semantic models / 0 reports, so the tab shows the setup card. To light up a
+  live embed: (1) in Fabric workspace `rayfin-demo`, create a semantic model + Power
+  BI report over the MDM SQL data (SQLEndpoint `mdm`), (2) enable secure embed, copy
+  the report id, (3) set the repo **variable** `POWERBI_REPORT_ID` (Settings →
+  Secrets and variables → Actions → Variables) and cut a release tag. For local dev,
+  add `VITE_POWERBI_REPORT_ID=<id>` to `mdm/.env.local`. Workspace/tenant are reused
+  from the existing Fabric config automatically.
+- **Tests:** `domain/models/__tests__/report-embed.test.ts` (secure-URL params,
+  ctid present/absent, encoding) + `infrastructure/reporting/__tests__/config-report-embed-provider.test.ts`
+  (each mode branch + null cases). Baseline grew 425 → 441.
+
 ### Deployment (Fabric)
 
 The PoC is deployed to Microsoft Fabric. Deploy with `npx rayfin up -y` from the
