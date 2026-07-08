@@ -39,7 +39,7 @@ describe('change-log-mapper serialization', () => {
       { field: 'notes', before: huge, after: huge },
     ]);
     expect(json).toBeDefined();
-    expect(json!.length).toBeLessThanOrEqual(8000);
+    expect(json!.length).toBeLessThanOrEqual(4000);
     const parsed = parseChangedFields(json);
     expect(parsed[0].field).toBe('notes');
   });

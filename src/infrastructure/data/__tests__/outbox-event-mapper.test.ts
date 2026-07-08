@@ -60,7 +60,7 @@ describe('serializePayload', () => {
     const big = { id: 'c-1', blob: 'x'.repeat(9000) };
     const serialized = serializePayload(big);
     expect(serialized).toBeDefined();
-    expect(serialized!.length).toBeLessThanOrEqual(8000);
+    expect(serialized!.length).toBeLessThanOrEqual(4000);
     const parsed = JSON.parse(serialized as string);
     expect(parsed).toEqual({ id: 'c-1', _truncated: true });
   });

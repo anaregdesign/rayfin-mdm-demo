@@ -34,7 +34,7 @@ export class ChangeRequest {
   operation!: 'create' | 'update' | 'status' | 'delete';
 
   /** JSON-serialized proposed input (`CustomerInput` / `ProductInput`). */
-  @text({ max: 8000, optional: true }) payload?: string;
+  @text({ max: 4000, optional: true }) payload?: string;
 
   /** Review state of the request. */
   @set('pending', 'approved', 'rejected')

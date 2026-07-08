@@ -32,7 +32,7 @@ export class MergeRecord {
   @text({ max: 2000, optional: true }) fieldSources?: string;
 
   /** JSON of the winner's editable input snapshot before the merge (for undo). */
-  @text({ max: 8000, optional: true }) winnerBefore?: string;
+  @text({ max: 4000, optional: true }) winnerBefore?: string;
 
   /** JSON map loserId → prior status (for undo restore). */
   @text({ max: 2000, optional: true }) loserStatuses?: string;

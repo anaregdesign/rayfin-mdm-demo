@@ -107,6 +107,15 @@ capabilities:
   `GuideContent` step/shortcut links). For **dynamic** navigation to a record id,
   the page owns `useNavigate` and passes an `onOpen`/`onNavigate` handler down as a
   prop (see `DashboardPage` → `RecentActivity`); components never call `useNavigate`.
+- **Entity `@text` limits (MSSQL/DAB).** Every `@text` field must be **bounded to
+  `max: 4000` or less** — 4000 is the MSSQL `NVARCHAR` sized-string limit. A single
+  field with a larger `max` makes `rayfin up` / `rayfin up db apply` **reject the
+  entire schema** (every pending table + column freezes — see "Deployed-schema
+  drift" under Deployment). Do **not** drop `max` to get `NVARCHAR(MAX)` either —
+  unbounded text breaks DAB GraphQL generation and can't be indexed. For larger
+  JSON payloads keep `max: 4000` and truncate defensively in the mapper. The unit
+  test `entity-text-limits.test.ts` enforces this across all entities, so the
+  mistake fails locally/in CI instead of silently at deploy time.
 
 To add a master field: update the `@entity` (+ `schema.ts`), the domain model +
 `*ToInput`/`empty*Input` + validation/quality policy, the mapper in
@@ -641,6 +650,47 @@ to deploy and populate your own.
 each deploy; use `--dry-run` to preview and `--force` only when you knowingly
 accept destructive schema changes. All entities are `@authenticated('*')` because
 anonymous access is not supported on Fabric.
+
+#### Deployed-schema drift (root cause + fix)
+
+Symptom seen in the live app: a red GraphQL banner ("field `parentId` /
+`relationType` / `mergedInto` / `mergedAt` does not exist on `Customer`") and
+every KPI at 0. Cause: the backend GraphQL type is **generated from the SQL
+columns** by Data API Builder, so a column the deployed DB lacks becomes a
+missing field and the whole query is rejected → no data anywhere.
+
+Root cause of the drift: four JSON columns had been authored with
+`@text({ max: 8000 })` (`ChangeLog.changedFields`, `MergeRecord.winnerBefore`,
+`ChangeRequest.payload`, `OutboxEvent.payload`). `rayfin up db apply` runs a
+**schema validation that aborts the ENTIRE apply** when any `@text` max exceeds
+4000. So none of the migrations from issues #4/#5/#7/#8/#12 ever reached the DB —
+five whole tables and several columns silently never got created — while the
+static bundle kept deploying green on every tag (the failed schema step is
+non-fatal to the overall `rayfin up`, and CI's HTTP-200 smoke test only probes
+the static shell). Fix: bound the four fields to `max: 4000` (done) and re-apply.
+
+Apply / re-apply the schema to the deployed DB as the workspace owner:
+
+```bash
+export RAYFIN_TOKEN="$(az account get-access-token \
+  --resource https://api.fabric.microsoft.com --query accessToken -o tsv)"
+npx rayfin up db apply --verbose   # schema-only: DDL + DAB config, no static build
+```
+
+`db apply` reads `rayfin/.env` + `rayfin/.deployments.json` (no `--workspace` flag);
+watch for "✅ Configuration applied successfully!". Adding new tables and nullable
+columns is additive, so existing seeded rows survive (verified: Customers/Products
+kept their rows). To confirm, inspect the live SQL directly with the same
+token-based connection `scripts/seed.mjs` uses (`--resource
+https://database.windows.net/`, `azure-active-directory-access-token`; split the
+`serverFqdn`'s `,1433` suffix into `server`/`port`, and retry once on a cold
+serverless "socket hang up"). Re-seed with `npm run seed` only if a table is empty.
+
+Guardrails so this can't recur: the `entity-text-limits.test.ts` unit test fails
+the build if any entity `@text` max exceeds 4000. A full `rayfin up` from CI
+re-applies the (now valid) schema on each `vX.Y.Z` release; because the failed
+schema step is non-fatal, the human owner should run `rayfin up db apply` after
+any schema change if the CI service principal cannot perform the DDL.
 
 ### CI/CD (GitHub Actions)
 
