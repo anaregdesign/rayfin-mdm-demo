@@ -93,23 +93,6 @@ jobs:
           } >> "$GITHUB_ENV"
           echo "Fabric token acquired (${#TOKEN} chars)."
 
-      # Bake optional Power BI report config into the deployed bundle. rayfin's
-      # internal `vite build` reads these `VITE_POWERBI_*` process-env vars (they
-      # take priority over .env files). All are optional: leave the repo
-      # variables unset and the BI tab shows a setup card. Only POWERBI_REPORT_ID
-      # is needed for a secure embed — workspace/tenant fall back to the Fabric
-      # values rayfin already injects. (An access token, if ever used, must be a
-      # GitHub *secret*, not a variable — token mode is an advanced path.)
-      - name: Configure Power BI embedding
-        run: |
-          {
-            echo "VITE_POWERBI_REPORT_ID=${{ vars.POWERBI_REPORT_ID }}"
-            echo "VITE_POWERBI_WORKSPACE_ID=${{ vars.POWERBI_WORKSPACE_ID }}"
-            echo "VITE_POWERBI_TENANT_ID=${{ vars.POWERBI_TENANT_ID }}"
-            echo "VITE_POWERBI_SECURE_EMBED_URL=${{ vars.POWERBI_SECURE_EMBED_URL }}"
-          } >> "$GITHUB_ENV"
-          echo "Power BI embedding configured (report id ${{ vars.POWERBI_REPORT_ID && 'set' || 'unset — setup card' }})."
-
       # Deploy. rayfin resolves the existing "mdm" item by display name in the
       # target workspace and updates it in place (idempotent — no duplicate).
       # rayfin injects the real RAYFIN_PUBLIC_* values during its own build step.

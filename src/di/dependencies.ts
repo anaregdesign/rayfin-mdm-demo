@@ -10,7 +10,6 @@ import type { CustomerRepository } from '@/domain/repositories/customer-reposito
 import type { MergeRecordRepository } from '@/domain/repositories/merge-record-repository';
 import type { OutboxEventRepository } from '@/domain/repositories/outbox-event-repository';
 import type { ProductRepository } from '@/domain/repositories/product-repository';
-import type { ReportEmbedProvider } from '@/domain/ports/report-embed-provider';
 
 /**
  * The application's assembled dependencies. Built once in the composition root
@@ -26,8 +25,6 @@ export interface AppDependencies {
   changeRequests: ChangeRequestRepository;
   outbox: OutboxEventRepository;
   httpClient: HttpClient;
-  /** Resolves the Power BI report embedding config (null when unconfigured). */
-  reportEmbed: ReportEmbedProvider;
   clock: Clock;
   /** True when the auth service requires Fabric interactive sign-in. */
   fabricAuthEnabled: boolean;

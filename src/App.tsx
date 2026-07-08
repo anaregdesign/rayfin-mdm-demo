@@ -24,7 +24,6 @@ import { GuidePage } from '@/pages/GuidePage';
 import { ProductDetailPage } from '@/pages/ProductDetailPage';
 import { ProductFormPage } from '@/pages/ProductFormPage';
 import { ProductListPage } from '@/pages/ProductListPage';
-import { ReportPage } from '@/pages/ReportPage';
 import { WorkQueuePage } from '@/pages/WorkQueuePage';
 import { RemediationPage } from '@/pages/RemediationPage';
 import { useAuth } from '@/usecase/auth/use-auth';
@@ -97,7 +96,6 @@ export default function App() {
         <Route path="/auth" element={<AuthRoute />} />
         <Route element={<ProtectedLayout />}>
           <Route path="/" element={<DashboardPage />} />
-          <Route path="/report" element={<ReportPage />} />
           <Route path="/customers" element={<CustomerListPage />} />
           <Route path="/customers/new" element={<CustomerFormPage />} />
           <Route path="/customers/:id" element={<CustomerDetailPage />} />

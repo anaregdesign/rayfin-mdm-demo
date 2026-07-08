@@ -4,8 +4,6 @@
  * plain config value instead of ambient globals.
  */
 
-import type { ReportEmbedSettings } from '@/infrastructure/reporting/config-report-embed-provider';
-
 export interface FabricConfig {
   workspaceId: string;
   projectId: string;
@@ -24,8 +22,6 @@ export interface AppConfig {
    */
   demoMode: boolean;
   fabric: FabricConfig | null;
-  /** Power BI report embedding config (all fields optional; unset = no report). */
-  reportEmbed: ReportEmbedSettings;
 }
 
 /**
@@ -38,29 +34,6 @@ function readDemoMode(): boolean {
   if (typeof raw !== 'string') return true;
   const v = raw.trim().toLowerCase();
   return !(v === 'false' || v === '0' || v === 'off' || v === 'no');
-}
-
-/**
- * Read optional Power BI embedding config. Uses dedicated `VITE_POWERBI_*` vars
- * (baked in at build time — see AGENTS.md for how the deploy workflow injects
- * them) and falls back to the existing Fabric workspace/tenant ids so that only
- * a single `VITE_POWERBI_REPORT_ID` is needed to light up a secure embed. Never
- * throws — an unconfigured report just renders a setup card.
- */
-function readReportEmbedSettings(): ReportEmbedSettings {
-  const env = import.meta.env;
-  const opt = (v: unknown): string | undefined =>
-    typeof v === 'string' && v.trim() !== '' ? v : undefined;
-  return {
-    reportId: opt(env.VITE_POWERBI_REPORT_ID),
-    workspaceId:
-      opt(env.VITE_POWERBI_WORKSPACE_ID) ?? opt(env.VITE_FABRIC_WORKSPACE_ID),
-    tenantId: opt(env.VITE_POWERBI_TENANT_ID) ?? opt(env.VITE_FABRIC_TENANT_ID),
-    embedUrl: opt(env.VITE_POWERBI_EMBED_URL),
-    accessToken: opt(env.VITE_POWERBI_ACCESS_TOKEN),
-    tokenType: opt(env.VITE_POWERBI_TOKEN_TYPE),
-    secureEmbedUrl: opt(env.VITE_POWERBI_SECURE_EMBED_URL),
-  };
 }
 
 function isLocalBackendUrl(url: string): boolean {
@@ -112,6 +85,5 @@ export function readAppConfig(): AppConfig {
     localDev,
     demoMode,
     fabric,
-    reportEmbed: readReportEmbedSettings(),
   };
 }
