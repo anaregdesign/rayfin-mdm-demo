@@ -31,7 +31,7 @@ export class OutboxEvent {
   eventType!: 'created' | 'updated' | 'merged' | 'status_changed';
 
   /** JSON-serialized snapshot of the record at emit time. */
-  @text({ max: 8000, optional: true }) payload?: string;
+  @text({ max: 4000, optional: true }) payload?: string;
 
   /** Actor (email or id) whose mutation produced the event. */
   @text({ max: 200, optional: true }) actorId?: string;

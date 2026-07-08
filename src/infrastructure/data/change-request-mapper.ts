@@ -10,8 +10,8 @@ import type { ChangeRequest as ChangeRequestEntity } from '../../../rayfin/data/
 /** Rayfin row shape for the ChangeRequest entity. */
 export type ChangeRequestRow = ChangeRequestEntity;
 
-/** Defensive cap so an oversized payload never breaks the DB write. */
-const MAX_PAYLOAD_JSON = 8000;
+/** Defensive cap (matches the entity `@text` max; MSSQL NVARCHAR limit is 4000). */
+const MAX_PAYLOAD_JSON = 4000;
 
 /** Parse the JSON `payload` column back into a plain object. */
 export function parsePayload(

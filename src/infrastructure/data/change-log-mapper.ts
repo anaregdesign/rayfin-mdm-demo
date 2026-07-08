@@ -10,8 +10,8 @@ import type { ChangeLog as ChangeLogEntity } from '../../../rayfin/data/ChangeLo
 /** Rayfin row shape for the ChangeLog entity. */
 export type ChangeLogRow = ChangeLogEntity;
 
-/** Defensive cap so an oversized diff never breaks the DB write. */
-const MAX_CHANGED_FIELDS_JSON = 8000;
+/** Defensive cap (matches the entity `@text` max; MSSQL NVARCHAR limit is 4000). */
+const MAX_CHANGED_FIELDS_JSON = 4000;
 
 /** Parse the JSON `changedFields` column back into `FieldChange[]`. */
 export function parseChangedFields(raw: string | undefined | null): FieldChange[] {

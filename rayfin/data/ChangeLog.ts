@@ -28,7 +28,7 @@ export class ChangeLog {
   action!: 'create' | 'update' | 'status' | 'delete';
 
   /** JSON-serialized `FieldChange[]` (before → after per field). */
-  @text({ max: 8000, optional: true }) changedFields?: string;
+  @text({ max: 4000, optional: true }) changedFields?: string;
 
   /** Actor (email or id) who performed the change. */
   @text({ max: 200, optional: true }) actorId?: string;
