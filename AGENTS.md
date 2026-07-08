@@ -130,6 +130,40 @@ To add a screen/tab: create a render-only component under
 (logo → vertical `NAV_ITEMS` nav → footer with `controls` slot + user + サインアウト)
 next to the scrolling `max-w-6xl` content area. Keep all labels/copy in Japanese.
 
+### Testing conventions & coverage
+
+- **Framework & layout.** Vitest (jsdom env, `globals: true`, `@/`→`src` alias,
+  setup `src/__tests__/setup.ts`). Tests are **co-located** in a `__tests__/`
+  dir next to the code under test and named `*.test.ts` (`.tsx` only when a React
+  component/provider is exercised). Always `import { describe, expect, it } from
+  'vitest';`.
+- **What to test (priority order).** Pure, framework-free logic carries the
+  regression net: **domain value-objects** (`value-objects/__tests__`),
+  **domain policies** (`policies/__tests__`), **domain models' derived helpers**
+  (e.g. `qualityBand`), **`src/lib/` utilities** (`text`, `format`, `csv`,
+  `normalize`), and **infrastructure mappers** (`infrastructure/data/__tests__` —
+  row↔domain round-trip + blank/null→undefined). Usecase selectors are unit-tested
+  where they hold logic (`usecase/*/__tests__/selectors.test.ts`). Components/pages
+  are render-only and are covered indirectly through the VM/policy tests, not with
+  DOM snapshots.
+- **Fixture style.** Build domain fixtures with small local `factory(overrides)`
+  helpers (see `duplicate-policy.test.ts`); for infra rows/inputs cast the factory
+  return with `as XxxRow` / `as XxxInput` and simulate null columns with
+  `null as unknown as string` (mirrors `customer-mapper.test.ts`).
+- **Determinism.** Inject `now`/thresholds into policies rather than reading the
+  clock (steward/analytics already accept a context). For `format`/date tests build
+  dates from **local components** (`new Date(2024, 0, 15, 9, 5)`) so assertions are
+  timezone-stable; for `Intl` currency/number assert loosely (contains the grouped
+  digits, not an exact glyph) to avoid ICU drift.
+- **Boundaries first.** Pin the exact rule edges — quality bands (80/79/50/49),
+  similarity threshold (≥ 0.82), validation length caps, status-transition maps,
+  score arithmetic. These are the cheapest things to regress and the whole point of
+  the suite.
+- **Run before shipping.** `npx vitest run` must stay green (current baseline
+  **425 tests / 37 files**) alongside `tsc -b`, `eslint .` (0 warnings),
+  `vite build`, and the four arch-drift greps. CI (`ci.yml`) re-runs the same gate
+  on every PR.
+
 ### Change history & audit (Issue #5)
 
 Every customer/product mutation is recorded as an immutable `ChangeLog` entry and
