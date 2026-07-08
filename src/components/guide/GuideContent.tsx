@@ -120,6 +120,12 @@ const FEATURES: Feature[] = [
       '件数・品質分布・ステータス内訳・品質トレンド・構成分析・重複候補・是正状況を一望。低品質カードからドリルダウンでき、CSV／印刷レポートも出力できます。',
   },
   {
+    tab: 'BIレポート',
+    to: '/report',
+    summary:
+      'マスタデータ上に作成した Power BI レポートを埋め込み表示。ダッシュボードの集計に加えて、対話的な分析・ドリルダウンを行えます（レポート未接続時は接続手順を案内）。',
+  },
+  {
     tab: '顧客マスタ',
     to: '/customers',
     summary:
@@ -250,6 +256,7 @@ const ROLES: RoleRow[] = [
 
 const QUICK_LINKS: QuickLink[] = [
   { to: '/', label: 'ダッシュボード', description: '品質・重複・件数・トレンドの全体像' },
+  { to: '/report', label: 'BIレポート', description: 'Power BI レポートの埋め込み表示' },
   { to: '/customers', label: '顧客マスタ', description: '顧客レコードの検索・登録・取込' },
   { to: '/products', label: '製品マスタ', description: '製品レコードの検索・登録・取込' },
   { to: '/categories', label: 'カテゴリ管理', description: '製品カテゴリ階層の管理' },
