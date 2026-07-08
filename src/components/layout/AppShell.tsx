@@ -10,6 +10,7 @@ interface AppShellProps {
 }
 
 const NAV_ITEMS = [
+  { to: '/guide', label: 'MDMガイド', end: false },
   { to: '/', label: 'ダッシュボード', end: true },
   { to: '/customers', label: '顧客マスタ', end: false },
   { to: '/products', label: '製品マスタ', end: false },
@@ -18,7 +19,6 @@ const NAV_ITEMS = [
   { to: '/remediation', label: '是正キュー', end: false },
   { to: '/distribution', label: '配信・連携', end: false },
   { to: '/approvals', label: '承認', end: false },
-  { to: '/guide', label: 'MDMガイド', end: false },
 ];
 
 function navClass({ isActive }: { isActive: boolean }): string {
