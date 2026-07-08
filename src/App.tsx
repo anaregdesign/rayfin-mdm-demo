@@ -10,6 +10,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { ApprovalModeToggle } from '@/components/approval/ApprovalModeToggle';
 import { RoleSwitcher } from '@/components/auth/RoleSwitcher';
 import { ROLE_VALUES } from '@/domain/models/authz';
+import { useDependencies } from '@/di/dependencies';
 import { LoadingState } from '@/components/shared/LoadingState';
 import { AuthPage } from '@/pages/AuthPage';
 import { ApprovalPage } from '@/pages/ApprovalPage';
@@ -56,14 +57,19 @@ function ProtectedLayout() {
     requireApproval,
     setRequireApproval,
   } = useAuth();
+  const { anonymousDemo } = useDependencies();
   if (loading) return <FullScreenLoading />;
   if (!isAuthenticated) return <Navigate to="/auth" replace />;
   return (
     <AppShell
       userName={user?.name ?? ''}
-      onSignOut={() => {
-        void signOut();
-      }}
+      onSignOut={
+        anonymousDemo
+          ? undefined
+          : () => {
+              void signOut();
+            }
+      }
       controls={
         <>
           <ApprovalModeToggle

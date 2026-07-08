@@ -891,6 +891,64 @@ npm run seed        # → scripts/seed.mjs
   only by the 会/會 kanji variant, and products sharing a barcode + near-identical
   name. `mssql` is a **devDependency** only (not bundled into the app).
 
+### Anonymous / demo mode (no sign-in)
+
+Because this is a public demo, the app defaults to a **fully client-side demo
+mode** that opens **straight into seeded data with no sign-in prompt**. It is
+gated by a single flag and swapped at the composition-root/port boundary, so the
+real Fabric backend + SSO path stays intact and one env var flips the whole
+data + auth layer.
+
+- **Flag: `VITE_DEMO_MODE`, default ON.** Owned by `infrastructure/config/env.ts`
+  (`readDemoMode()` + `AppConfig.demoMode`). Only an explicit falsy string
+  (`false`/`0`/`off`/`no`, case-insensitive) turns it **off**; anything else — or
+  unset — is **on**. A plain production build is therefore a no-login demo unless
+  deliberately switched to real auth. The two config throws (missing
+  `VITE_RAYFIN_PUBLISHABLE_KEY`; missing `VITE_FABRIC_*`) are guarded with
+  `&& !demoMode`, so a prod-like demo build with no keys does **not** throw and
+  `fabric` stays `null`.
+- **Composition-root seam.** `infrastructure/config/create-dependencies.ts` returns
+  early via `createDemoDependencies(config)` when `config.demoMode` is true. It
+  builds the **whole** graph from in-memory repos + the demo auth adapter and sets
+  `AppDependencies.anonymousDemo = true`; the real path returns
+  `anonymousDemo: false`. Nothing above the DI layer knows which backend it got —
+  the ports are identical.
+- **In-memory data layer** (`infrastructure/data/in-memory/`): one repo per port
+  (`customer`, `product`, `change-log`, `merge-record`, `change-request`, `outbox`,
+  `category`), each cloning rows in/out (`clone.ts` = `structuredClone` wrapper) so
+  callers can never mutate stored state. They mirror the Rayfin adapters' ordering
+  and audit semantics exactly (e.g. `list` newest-first; `Object.assign(row, input,
+  {updatedAt, updatedBy})` on update — **omitted keys are not cleared**; outbox
+  `setDeliveryStatus` clears `deliveredAt` unless status is `delivered`). Demo mode
+  **reuses the same decorator chain** as production
+  (`Distribution(ChangeLogging(base, changeLog, actor), outbox, actor)`) so change
+  history + outbox events work client-side too.
+- **Seed.** `demo-seed.ts` `buildDemoSeed(now)` returns FULL domain models
+  (`Customer[]`/`Product[]`/`Category[]`) with stable ids (`cust-<code>` /
+  `prod-<sku>` / `cat-<code>`) and descending audit timestamps, authored by
+  `SEED_USER`. It carries the same intentional demo scenarios as the SQL seeder
+  (duplicate pairs, quality/status spread, a category tree) so both backends
+  demonstrate the same behaviour. Keep the two seeders aligned when you add records.
+- **Auto-auth.** `infrastructure/auth/demo-auth-service.ts` (`DemoAuthService`,
+  `fabricAuthEnabled = false`) resolves a fixed `admin` `DEMO_USER`
+  (`demo@contoso.com`) from `signIn`/`getCurrentUser`/`initEmbeddedAuth` with **no
+  network call**. Because `AuthContext`'s bootstrap uses `initEmbeddedAuth()`, the
+  provider auto-authenticates → `ProtectedLayout` renders immediately with **no
+  `/auth` redirect**. The demo role switcher still lets you exercise
+  viewer/steward at runtime. The `actor` audit closure is `() => DEMO_USER_EMAIL`.
+- **Sign-out hidden.** `AppShell.onSignOut` is optional; `App.tsx`'s
+  `ProtectedLayout` reads `anonymousDemo` from `useDependencies()` and passes
+  `onSignOut={anonymousDemo ? undefined : …}`, so the サインアウト button only
+  renders on the real-auth path (nothing to sign out of in demo mode).
+- **To run against the real Fabric backend + SSO:** build with
+  `VITE_DEMO_MODE=false` **and** provide the real `VITE_RAYFIN_PUBLISHABLE_KEY` +
+  `VITE_FABRIC_*` values (see Deployment). Everything else is unchanged — the app
+  code depends only on the ports.
+- **CD-safe.** The default-ON demo does not affect the deploy smoke test (a static
+  HTTP-200 probe of the shell), and the in-memory graph satisfies every port method
+  the use-case/decorator layers call (enforced by `tsc` + unit tests in
+  `infrastructure/{data/in-memory,auth,config}/__tests__/`).
+
 ### Roadmap & coverage (planned enhancements)
 
 The PoC is measured against the **12-domain general MDM functional requirements**

@@ -3,7 +3,8 @@ import { NavLink } from 'react-router-dom';
 
 interface AppShellProps {
   userName: string;
-  onSignOut: () => void;
+  /** Sign-out handler. Omit in demo mode to hide the control (no real session). */
+  onSignOut?: () => void;
   /** Extra controls rendered in the sidebar footer (role switcher, toggles). */
   controls?: ReactNode;
   children: ReactNode;
@@ -60,12 +61,14 @@ export function AppShell({ userName, onSignOut, controls, children }: AppShellPr
               {userName}
             </span>
           )}
-          <button
-            onClick={onSignOut}
-            className="rounded-md px-3 py-2 text-left text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-          >
-            サインアウト
-          </button>
+          {onSignOut && (
+            <button
+              onClick={onSignOut}
+              className="rounded-md px-3 py-2 text-left text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            >
+              サインアウト
+            </button>
+          )}
         </div>
       </aside>
       <div className="min-w-0 flex-1">
